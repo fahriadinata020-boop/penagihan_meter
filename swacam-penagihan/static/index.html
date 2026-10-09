@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<title>PLN S2JB - Penagihan &amp; WhatsApp</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#05256a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="S2JB Tagih">
+<link rel="apple-touch-icon" href="/static/logo-pln.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="/static/style.css?v=1791529002">
+</head>
+<body>
+
+<style id="fast-auth-hide"></style>
+<script>
+  if (localStorage.getItem('swacam_token') || location.hash.startsWith('#sso=')) {
+      document.getElementById('fast-auth-hide').innerHTML = '#login-modal { display: none !important; }';
+  }
+</script>
+
+
+<!-- LOGIN MODAL (fullscreen) -->
+<div id="login-modal">
+  <div class="auth-wrap">
+
+      <!-- Mobile logo -->
+      <div class="flex md:hidden items-center gap-3 mb-8 justify-center">
+        <div style="width:44px;height:44px;border-radius:12px;background:#002060;display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:1.4rem;">&#9889;</span>
+        </div>
+        <div>
+          <p style="color:#002060;font-weight:800;font-size:1.05rem;">PLN S2JB</p>
+          <p style="color:#64748b;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;">Penagihan &amp; WhatsApp</p>
+        </div>
+      </div>
+
+      <!-- Form Card -->
+      <div class="auth-card">
+
+        <!-- PLN Watermark background (behind content) -->
+        <div class="auth-watermark">
+          <img src="/static/logo-pln.png" alt="" style="height:180px;filter:grayscale(1);" onerror="this.style.display='none'">
+        </div>
+
+        <!-- Header stripe (PLN navy + logo) -->
+        <div class="auth-header">
+          <div class="auth-logo-box">
+            <img src="/static/logo-pln.png" alt="PLN" style="height:28px;" onerror="this.innerHTML='&#9889;';this.style.color='#FFB800';this.style.fontSize='1.4rem';">
+          </div>
+          <div>
+            <p style="color:#FFB800;font-weight:800;font-size:.95rem;letter-spacing:.03em;line-height:1.1;">PLN S2JB</p>
+            <p style="color:rgba(232, 231, 241, 0.5);font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;">Penagihan &amp; WhatsApp </p>
+          </div>
+        </div>
+
+        <!-- Form body: LOGIN -->
+        <div id="login-body" class="auth-body">
+        <h2 class="auth-title">Masuk ke Sistem</h2>
+        <p class="auth-sub">Autentikasi akun petugas PLN S2JB</p>
+
+        <div id="login-err" class="hidden err-box">
+          <i class="fa fa-triangle-exclamation"></i>
+          <span id="login-err-text"></span>
+        </div>
+
+        <div class="field">
+          <label class="field-label">USERNAME</label>
+          <div class="field-wrap">
+            <div class="field-icon"><i class="fa fa-user"></i></div>
+            <input id="lu" class="field-input" type="text" placeholder="Masukkan username"
+              onkeydown="if(event.key==='Enter')document.getElementById('lp').focus()">
+          </div>
+        </div>
+
+        <div class="field last">
+          <label class="field-label">PASSWORD</label>
+          <div class="field-wrap">
+            <div class="field-icon"><i class="fa fa-lock"></i></div>
+            <input id="lp" class="field-input has-eye" type="password" placeholder="Masukkan password"
+              onkeydown="if(event.key==='Enter')doLogin()">
+            <button type="button" class="eye-btn"
+              onclick="const i=document.getElementById('lp');i.type=i.type==='password'?'text':'password';this.querySelector('i').className=i.type==='password'?'fa fa-eye':'fa fa-eye-slash';">
+              <i class="fa fa-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <button onclick="doLogin()" id="login-btn" class="auth-btn">
+          <i class="fa fa-bolt"></i>
+          <span>MASUK KE SISTEM</span>
+        </button>
+
+        <div class="auth-link-wrap">
+          <button type="button" onclick="toggleRegisterForm()" class="auth-link">Belum punya akun? Daftar sekarang</button>
+          <div style="margin-top:6px;">
+            <button type="button" onclick="toggleForgotForm()" class="auth-link muted">Lupa password?</button>
+          </div>
+        </div>
+        </div><!-- /login-body -->
+
+        <!-- Form body: FORGOT PASSWORD (Hidden) -->
+        <div id="forgot-body" class="auth-body" style="display:none;">
+          <h2 class="auth-title">Lupa Password</h2>
+          <p class="auth-sub">Masukkan username &amp; nama lengkap sesuai akun Anda. Admin akan meninjau dan mereset password Anda.</p>
+
+          <div id="forgot-err" class="hidden err-box">
+            <i class="fa fa-triangle-exclamation"></i>
+            <span id="forgot-err-text"></span>
+          </div>
+
+          <div class="field">
+            <label class="field-label">USERNAME</label>
+            <div class="field-wrap">
+              <div class="field-icon"><i class="fa fa-user"></i></div>
+              <input id="fp-user" class="field-input" type="text" placeholder="Masukkan username Anda">
+            </div>
+          </div>
+          <div class="field last">
+            <label class="field-label">NAMA LENGKAP</label>
+            <div class="field-wrap">
+              <div class="field-icon"><i class="fa fa-id-card"></i></div>
+              <input id="fp-name" class="field-input" type="text" placeholder="Sesuai saat pendaftaran akun">
+            </div>
+          </div>
+          <button onclick="doForgotPassword()" id="forgot-btn" class="auth-btn">
+            <i class="fa fa-key"></i>
+            <span>AJUKAN RESET PASSWORD</span>
+          </button>
+          <div class="auth-link-wrap">
+            <button type="button" onclick="toggleForgotForm()" class="auth-link muted">&larr; Kembali ke halaman Login</button>
+          </div>
+        </div><!-- /forgot-body -->
+
+        <!-- Form body: REGISTER (Hidden) -->
+        <div id="register-body" class="auth-body" style="display:none;">
+          <h2 class="auth-title">Daftar Akun Baru</h2>
+          <p class="auth-sub">Buat akun petugas (memerlukan persetujuan Admin)</p>
+
+          <div id="reg-err" class="hidden err-box">
+            <i class="fa fa-triangle-exclamation"></i>
+            <span id="reg-err-text"></span>
+          </div>
+
+          <div class="field">
+            <label class="field-label">NAMA LENGKAP</label>
+            <div class="field-wrap">
+              <div class="field-icon"><i class="fa fa-id-card"></i></div>
+              <input id="ru-name" class="field-input" type="text" placeholder="Masukkan nama lengkap">
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">NO. WHATSAPP</label>
+            <div class="field-wrap">
+              <div class="field-icon"><i class="fa fa-whatsapp"></i></div>
+              <input id="ru-phone" class="field-input" type="text" placeholder="Misal: 08123456789">
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">USERNAME</label>
+            <div class="field-wrap">
+              <div class="field-icon"><i class="fa fa-user"></i></div>
+              <input id="ru-user" class="field-input" type="text" placeholder="Buat username">
+            </div>
+          </div>
+          <div class="field last">
+            <label class="field-label">PASSWORD</label>
+            <div class="field-wrap">
+              <div class="field-icon"><i class="fa fa-lock"></i></div>
+              <input id="ru-pass" class="field-input" type="password" placeholder="Buat password">
+            </div>
+          </div>
+          <button onclick="doRegister()" id="reg-btn" class="auth-btn">
+            <i class="fa fa-user-plus"></i>
+            <span>DAFTARKAN AKUN</span>
+          </button>
+          <div class="auth-link-wrap">
+            <button type="button" onclick="toggleRegisterForm()" class="auth-link muted">&larr; Kembali ke halaman Login</button>
+          </div>
+        </div><!-- /register-body -->
+      </div><!-- /auth-card -->
+
+      <!-- Footer with PLN watermark -->
+      <div class="auth-footer">
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px;opacity:0.65;">
+          <img src="/static/logo-pln.png" alt="PLN" style="height:22px;filter:grayscale(1);" onerror="this.style.display='none'">
+          <span style="font-size:.72rem;font-weight:700;color:#475569;letter-spacing:.06em;">PT PLN (PERSERO)</span>
+        </div>
+        <p style="color:#94a3b8;font-size:.67rem;">&copy; 2026 PT PLN (Persero) &middot; SWACAM v2.0 &middot; Confidential</p>
+      </div>
+  </div><!-- /auth-wrap -->
+</div><!-- /login-modal -->
+
+<!-- PROFILE MODAL -->
+<div id="profile-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+  <div class="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden relative transform transition-all">
+    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <h3 class="font-bold text-slate-800"><i class="fa fa-id-card text-blue-500 mr-2"></i> Profil Pengguna</h3>
+      <button onclick="document.getElementById('profile-modal').classList.add('hidden')" class="text-slate-400 hover:text-rose-500"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="p-6">
+      <div class="flex justify-center mb-2">
+        <div class="relative">
+          <div id="prof-av" class="w-20 h-20 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-md bg-cover bg-center" style="background:linear-gradient(135deg,#002060,#1a6fd4)">U</div>
+          <button onclick="document.getElementById('prof-photo-input').click()" class="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white border border-slate-200 shadow flex items-center justify-center text-slate-500 hover:text-blue-600" title="Ganti foto">
+            <i class="fa fa-camera text-xs"></i>
+          </button>
+          <input type="file" id="prof-photo-input" accept=".jpg,.jpeg,.png,.webp" class="hidden" onchange="uploadPhoto(this)">
+        </div>
+      </div>
+      <p class="text-center text-[10px] text-slate-400 mb-4">Klik ikon kamera untuk ganti foto (maks 20MB)</p>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 mb-1">NAMA LENGKAP</label>
+          <input type="text" id="prof-name" class="w-full text-sm font-semibold text-slate-700 p-2.5 border border-slate-200 rounded-lg focus:border-blue-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 mb-1">USERNAME</label>
+          <input type="text" id="prof-user" class="w-full text-sm font-semibold text-slate-700 p-2.5 border border-slate-200 rounded-lg focus:border-blue-500 outline-none" title="Username untuk login">
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 mb-1">HAK AKSES / ROLE</label>
+          <div id="prof-role" class="inline-block px-3 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-full uppercase">-</div>
+        </div>
+        <button type="button" onclick="saveBasicProfile()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 rounded-lg text-sm transition mb-2"><i class="fa fa-save mr-2"></i> Simpan Nama & Username</button>
+
+        <div class="pt-2 border-t border-slate-100">
+          <label class="block text-[10px] font-bold text-slate-400 mb-1"><i class="fa fa-whatsapp text-green-500 mr-1"></i> NO. WHATSAPP</label>
+          <div class="flex gap-2">
+            <input type="text" id="prof-phone" placeholder="Contoh: 08123456789" class="flex-1 text-sm p-2.5 border border-slate-200 rounded-lg focus:border-green-500 outline-none">
+            <button onclick="savePhone()" class="bg-green-500 hover:bg-green-600 text-white font-bold px-3 py-2 rounded-lg text-sm transition"><i class="fa fa-save"></i></button>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">Nomor WhatsApp akun Anda</p>
+        </div>
+      </div>
+      <hr class="my-5 border-slate-100">
+      <h4 class="text-xs font-bold text-slate-800 mb-3"><i class="fa fa-lock text-slate-400 mr-1"></i> Ganti Password</h4>
+      <div class="space-y-3">
+        <input type="password" id="prof-pass" placeholder="Ketik Password Baru" class="w-full text-sm p-2.5 border border-slate-200 rounded-lg focus:border-blue-500 outline-none">
+        <button onclick="saveProfile()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-sm transition"><i class="fa fa-save mr-2"></i> Simpan Password Baru</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div id="mob-overlay" onclick="closeSB()"></div>
+
+<div class="flex" style="height: 100vh; overflow: hidden;">
+
+<!-- SIDEBAR -->
+<nav id="sidebar" class="flex flex-col h-screen overflow-y-auto">
+  <div class="p-5 flex items-center gap-3" style="border-bottom: 1px solid rgba(255,255,255,.05)">
+    <img src="/static/logo-pln.png" alt="Logo" class="h-9 bg-white p-1 rounded" onerror="this.style.display='none'">
+    <div>
+      <p class="text-white font-bold text-base leading-tight">SWACAM</p>
+      <p style="color:#7fb3e8; font-size:.65rem; text-transform:uppercase; letter-spacing:.05em">Penagihan &amp; WA</p>
+    </div>
+  </div>
+  <div class="flex-1 py-4">
+    <div class="nav-item active" onclick="showPage('page-dash', this)"><i class="fa fa-gauge-high text-sky-300"></i> Dashboard</div>
+    <div class="nav-item" onclick="showPage('page-tunggakan', this)"><i class="fa fa-file-invoice-dollar text-amber-400"></i> Impor Tunggakan</div>
+    <div class="nav-item" onclick="showPage('page-inbox', this)"><i class="fa fa-inbox text-purple-400"></i> Kotak Masuk WA <span id="sb-inbox-badge" class="hidden ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500 text-white">0</span></div>
+    <div class="nav-item admin-only hidden" onclick="showPage('page-analitik', this)"><i class="fa fa-chart-line text-sky-400"></i> Analitik &amp; Laporan</div>
+    <div class="nav-item admin-only hidden" onclick="showPage('page-riwayat', this)"><i class="fa fa-clock-rotate-left text-emerald-400"></i> Riwayat WA</div>
+    <div class="nav-item admin-only hidden" onclick="showPage('page-users', this)"><i class="fa fa-users-gear text-orange-400"></i> Kelola Petugas <span id="sb-users-badge" class="hidden ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white">0</span></div>
+  </div>
+  <div class="p-5" style="background: rgba(0,0,0,.15)">
+    <div class="flex items-center gap-3 mb-4 cursor-pointer hover:opacity-80 transition" onclick="openProfile()" title="Lihat Profil">
+      <div id="sb-av" class="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold" style="background:#1a6fd4">A</div>
+      <div class="flex-1 min-w-0">
+        <p id="sb-name" class="text-white text-sm font-semibold truncate">-</p>
+        <p id="sb-role" style="color:#7fb3e8; font-size:.7rem; text-transform:uppercase">-</p>
+      </div>
+    </div>
+    <button onclick="openProfile()" class="w-full text-sm rounded-xl py-2 px-3 flex items-center justify-center gap-2 transition font-medium mb-2 text-white hover:text-blue-200" style="background:rgba(255,255,255,.1)" onmouseover="this.style.background='rgba(255,255,255,.2)'" onmouseout="this.style.background='rgba(255,255,255,.1)'">
+      <i class="fa fa-user"></i> Profil Saya
+    </button>
+    <button onclick="doLogout()" class="w-full text-sm rounded-xl py-2 px-3 flex items-center justify-center gap-2 transition font-medium" style="color:#fca5a5; background:rgba(220,38,38,.1)" onmouseover="this.style.background='rgba(220,38,38,.2)'" onmouseout="this.style.background='rgba(220,38,38,.1)'">
+      <i class="fa fa-right-from-bracket"></i> Keluar
+    </button>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<div id="main-content" class="flex-1 flex flex-col overflow-hidden" style="margin-left:0">
+  
+  <!-- TOPBAR -->
+  <header class="bg-white px-6 py-4 flex items-center gap-3 z-40" style="border-bottom: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,.02)">
+    <button onclick="toggleSB()" class="text-slate-500 hover:text-blue-600 md:hidden text-xl"><i class="fa fa-bars"></i></button>
+    <h1 id="pg-title" class="text-lg font-bold text-slate-800 flex-1">Dashboard Penagihan</h1>
+
+    <!-- Fonnte WA Status Widget -->
+    <div id="tb-fonnte-status" class="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition" onclick="checkDeviceStatus(true)" title="Status koneksi WhatsApp Fonnte (klik untuk refresh)">
+      <span id="tb-fonnte-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+      <span id="tb-fonnte-text" class="text-slate-600">Cek WA...</span>
+    </div>
+
+    <!-- Jam Operasional Widget -->
+    <div id="tb-jam-status" class="hidden md:flex items-center gap-1.5 text-xs text-slate-600 font-semibold px-3 py-1 bg-slate-50 border border-slate-200 rounded-full cursor-pointer hover:bg-slate-100 transition" onclick="openJamOperasionalModal()" title="Jam operasional pengiriman WA (klik untuk atur)">
+      <i class="fa fa-clock text-blue-500"></i>
+      <span id="tb-jam-text">08:00 - 17:00</span>
+    </div>
+
+    <!-- Inbox Button -->
+    <button onclick="showPage('page-inbox')" class="relative text-slate-500 hover:text-purple-600 transition bg-slate-50 hover:bg-purple-50 w-8 h-8 rounded-full flex items-center justify-center border border-slate-200" title="Kotak Masuk Balasan Pelanggan">
+      <i class="fa fa-inbox text-sm"></i>
+      <span id="tb-inbox-badge" class="hidden absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">0</span>
+    </button>
+
+    <span id="role-badge" class="hidden text-xs font-bold px-3 py-1 rounded-full" style="background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe">ADMINISTRATOR</span>
+    <button id="dark-toggle" onclick="toggleDark()" class="text-slate-400 hover:text-blue-600 transition bg-slate-50 hover:bg-blue-50 w-8 h-8 rounded-full flex items-center justify-center border border-slate-200" title="Dark Mode"><i class="fa fa-moon" id="dark-icon"></i></button>
+    <button onclick="doRefresh(this)" class="text-slate-400 hover:text-blue-600 transition bg-slate-50 hover:bg-blue-50 w-8 h-8 rounded-full flex items-center justify-center border border-slate-200" title="Refresh Data"><i class="fa fa-rotate-right"></i></button>
+  </header>
+
+  <!-- CONTENT WRAPPER -->
+  <div class="flex-1 overflow-y-auto p-6 relative">
+
+    <!-- PAGE: DASHBOARD PENAGIHAN -->
+    <section id="page-dash" class="page active space-y-6">
+      <div class="db-hero">
+        <div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+        <div class="relative z-10 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <span class="db-live"><i></i> DATA LANGSUNG</span>
+            <h2 class="text-2xl font-extrabold tracking-tight mt-3" id="db-hello">Dashboard Penagihan</h2>
+            <p class="text-sm mt-1" style="color:#bfdbfe" id="db-sub">Memuat ringkasan tagihan dan WhatsApp...</p>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn-p" style="background:#fbbf24;color:#422006" onclick="showPage('page-tunggakan')"><i class="fa fa-file-import"></i> Impor &amp; Kirim WA</button>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div class="db-kpi" style="--i:0;--c:#1a6fd4;--bg:#eff6ff"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-file-invoice"></i></div></div><div class="n" id="k-total"><div class="db-skel"></div></div><div class="l">Total Tagihan</div></div>
+      <div class="db-kpi" style="--i:1;--c:#e11d48;--bg:#fff1f2"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-triangle-exclamation"></i></div></div><div class="n" id="k-tunggak"><div class="db-skel"></div></div><div class="l">Menunggak</div></div>
+      <div class="db-kpi" style="--i:2;--c:#d97706;--bg:#fffbeb"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-hourglass-half"></i></div></div><div class="n" id="k-belum"><div class="db-skel"></div></div><div class="l">Belum Jatuh Tempo</div></div>
+      <div class="db-kpi" style="--i:3;--c:#059669;--bg:#ecfdf5"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-circle-check"></i></div></div><div class="n" id="k-lunas"><div class="db-skel"></div></div><div class="l">Lunas</div></div>
+      <div class="db-kpi" style="--i:4;--c:#7c3aed;--bg:#f5f3ff"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-sack-dollar"></i></div></div><div class="n" id="k-nominal"><div class="db-skel"></div></div><div class="l">Nominal Menunggak</div></div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="db-card" style="--i:5"><h3><i class="fa fa-chart-pie text-sky-500 mr-2"></i>Status Tagihan</h3><div style="height:230px"><canvas id="db-donut"></canvas></div></div>
+        <div class="db-card lg:col-span-2" style="--i:6"><h3><i class="fa fa-chart-column text-violet-500 mr-2"></i>Nominal per Periode (Rp)</h3><div style="height:230px"><canvas id="db-bar"></canvas></div></div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="db-card" style="--i:7"><h3><i class="fa fa-paper-plane text-emerald-500 mr-2"></i>Jangkauan WhatsApp</h3>
+          <div class="flex items-center gap-5">
+            <svg class="db-ring" width="120" height="120" viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="#e2e8f0" stroke-width="12"/><circle id="db-ring-v" class="v" cx="60" cy="60" r="50" fill="none" stroke="#10b981" stroke-width="12" transform="rotate(-90 60 60)" style="--len:314;--off:314"/><text id="db-ring-t" x="60" y="66" text-anchor="middle" font-size="22" font-weight="800" fill="#059669">0%</text></svg>
+            <div class="text-xs text-slate-500 space-y-1.5" id="db-wa-det">-</div>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-3">Persentase tagihan menunggak yang sudah pernah dikirimi WA.</p>
+        </div>
+        <div class="db-card lg:col-span-2" style="--i:8"><h3><i class="fa fa-clock-rotate-left text-amber-500 mr-2"></i>Pelanggan Menunggak Terlama</h3><div id="db-top"><div class="db-skel" style="width:100%"></div></div></div>
+      </div>
+    </section>
+
+    <!-- PAGE: TAGIHAN MENUNGGAK (Admin Only) -->
+    <section id="page-tunggakan" class="page space-y-6">
+      <div class="tg-hero">
+        <div class="relative z-10">
+          <h2 class="text-xl font-extrabold tracking-tight"><i class="fa fa-file-invoice-dollar mr-2 text-amber-300"></i>Impor Tunggakan &amp; Kirim WhatsApp</h2>
+          <p class="text-xs text-blue-100 mt-1.5 max-w-xl leading-relaxed">Unggah laporan pelanggan, periksa seluruh datanya, lalu kirim pengingat WhatsApp ke pelanggan yang menunggak.</p>
+        </div>
+        <div class="relative z-10 flex flex-wrap gap-2">
+          <a href="/api/tunggakan/template" onclick="tgUnduhTemplate(event)" class="tg-hero-btn"><i class="fa fa-download"></i>Unduh template</a>
+          <button type="button" onclick="tgSyncMeter()" class="tg-hero-btn" title="Tarik data tagihan langsung dari database Catat Meter"><i class="fa fa-rotate"></i>Tarik dari Catat Meter</button>
+          <button type="button" onclick="tgEksporCsv()" class="tg-hero-btn"><i class="fa fa-file-csv"></i>Ekspor tampilan</button>
+          <button type="button" onclick="loadTunggakan(true)" class="tg-hero-btn" title="Muat ulang data"><i class="fa fa-rotate"></i></button>
+        </div>
+      </div>
+
+      <div id="tg-notice" class="hidden bg-sky-50 border border-sky-200 text-sky-800 text-sm rounded-xl px-4 py-3 flex items-start gap-3"><i class="fa fa-bell mt-0.5"></i><div id="tg-notice-txt" class="flex-1"></div></div>
+      <div id="tg-warn-token" class="hidden bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl px-4 py-3"><i class="fa fa-triangle-exclamation mr-2"></i>FONNTE_TOKEN belum diisi di file <b>.env</b>. Pesan WA belum bisa dikirim.</div>
+
+      <!-- Upload -->
+      <div class="tg-card">
+        <p class="tg-card-t mb-4"><span class="tg-step">1</span>Impor laporan pelanggan <span class="font-normal text-slate-400 text-xs ml-1">Excel / CSV, format kolom bebas</span></p>
+        <label id="tg-drop" class="tg-drop" for="tg-file">
+          <span class="tg-drop-ic"><i class="fa fa-cloud-arrow-up"></i></span>
+          <span class="flex-1 min-w-0">
+            <b id="tg-drop-t" class="block text-sm text-slate-700 truncate">Tarik file ke sini, atau klik untuk memilih</b>
+            <span id="tg-drop-s" class="text-[11px] text-slate-400">.xlsx, .xlsm, atau .csv · maksimal 5 MB</span>
+          </span>
+          <span class="tg-drop-btn">Pilih file</span>
+          <input id="tg-file" type="file" accept=".xlsx,.xlsm,.csv" class="hidden" onchange="tgFilePicked()">
+        </label>
+        <div class="flex flex-wrap items-end gap-4 mt-4">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-500 mb-1">Batas tanggal bayar</label>
+            <div class="tg-stepper"><button type="button" onclick="tgStep(-1)" aria-label="Kurangi">−</button><input id="tg-batas" type="number" min="1" max="31" value="20"><button type="button" onclick="tgStep(1)" aria-label="Tambah">+</button></div>
+          </div>
+          <label class="tg-opt" title="Hanya bulan yang ada di file ini yang diganti. Bulan lain tidak disentuh.">
+            <input type="checkbox" id="tg-ganti"><span><b>Ganti data bulan ini</b><small>hapus yang tidak ada di file baru</small></span>
+          </label>
+          <button id="tg-btn-upload" onclick="tgUpload()" class="btn-p"><i class="fa fa-cloud-arrow-up"></i> Upload &amp; Baca</button>
+          <button type="button" onclick="document.getElementById('tg-help').classList.toggle('hidden')" class="text-xs font-bold text-blue-600 hover:underline ml-auto"><i class="fa fa-circle-question mr-1"></i>Cara kerja</button>
+        </div>
+        <p id="tg-help" class="hidden text-[11px] text-slate-500 mt-3 leading-relaxed bg-slate-50 rounded-lg p-3">Sistem mengenali kolom dari judul. Bila <b>belum lunas</b> dan hari ini <b>sudah lewat tanggal batas</b> (default 20), pesan WA bisa dikirim; bila <b>belum</b> lewat tanggal batas, sistem hanya menampilkan pemberitahuan. Seluruh isi file ikut ditampilkan (termasuk yang sudah lunas). <b>Data lama tidak dihapus</b>: pelanggan yang sama (IDPEL + periode) diperbarui, yang baru ditambahkan. Data disimpan <b>per bulan</b> sesuai kolom Periode di file (upload bulan Agustus tersimpan sebagai "Data Agustus 2026"). Centang <b>Ganti data bulan ini</b> bila ingin data lama pada bulan yang sama yang tidak ada di file baru dihapus; bulan lain tidak disentuh. Riwayat WA yang sudah terkirim selalu tersimpan.</p>
+        <div id="tg-summary" class="hidden mt-4"></div>
+      </div>
+
+      <!-- Template pesan -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+        <div class="flex items-center justify-between cursor-pointer" onclick="document.getElementById('tg-tpl-box').classList.toggle('hidden')">
+          <p class="text-sm font-bold text-slate-700">2. Isi pesan WhatsApp <span class="text-[11px] font-normal text-slate-400">(klik untuk lihat / ubah)</span></p>
+          <div class="flex items-center gap-3">
+            <select id="tg-tpl-pilih" onclick="event.stopPropagation()" onchange="tgGantiTemplate()" class="hidden text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-white max-w-[260px]" title="Pilih template pesan"></select>
+            <i class="fa fa-chevron-down text-slate-400 text-xs"></i>
+          </div>
+        </div>
+        <div id="tg-tpl-box" class="hidden mt-3">
+          <div id="tg-tpl-auto" class="hidden text-xs text-slate-600 bg-emerald-50 border border-emerald-100 rounded-xl p-4 leading-relaxed"></div>
+          <textarea id="tg-template" rows="14" class="w-full text-sm border border-slate-200 rounded-lg p-3 font-mono"></textarea>
+          <div class="flex flex-wrap items-center gap-2 mt-2">
+            <span class="text-[11px] text-slate-500">Kata kunci:</span>
+            <span id="tg-ph" class="text-[11px] text-blue-600 font-mono"></span>
+            <button id="tg-tpl-simpan" onclick="tgSimpanTemplate()" class="hidden ml-auto text-xs font-bold text-emerald-600 hover:underline"><i class="fa fa-floppy-disk mr-1"></i>Simpan ke template ini</button>
+            <button onclick="tgResetTemplate()" class="text-xs font-bold text-slate-500 hover:text-blue-600"><i class="fa fa-rotate-left mr-1"></i>Kembalikan pesan awal</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pilih bulan data (sesuai kolom Periode pada file yang diupload) -->
+      <div id="tg-periode" class="tg-per-bar"></div>
+
+      <!-- Ringkasan (klik untuk menyaring tabel) -->
+      <div id="tg-stats" class="tg-stats"></div>
+
+      <!-- Daftar -->
+      <div id="tg-table-card" class="tg-card !p-0 overflow-hidden">
+        <div class="p-5 pb-3 flex flex-wrap items-center gap-3">
+          <p class="tg-card-t mr-auto"><span class="tg-step">3</span><span id="tg-judul">Data pelanggan</span> <span id="tg-count" class="tg-pill">0</span>
+            <button id="tg-filter-info" type="button" onclick="tgSetKat('')" class="hidden tg-chip-x" title="Hapus saringan"></button></p>
+          <div class="tg-search"><i class="fa fa-magnifying-glass"></i><input id="tg-search" oninput="tgPage=1;tgRender()" placeholder="Cari IDPEL / nama / nomor..."></div>
+          <select id="tg-filter" onchange="tgPage=1;tgRender()" class="tg-sel">
+            <option value="">Semua status WA</option><option value="BELUM">Belum dikirim</option>
+            <option value="TERKIRIM">Terkirim</option><option value="GAGAL">Gagal</option>
+          </select>
+          <select id="tg-per" onchange="tgPer=+this.value;tgPage=1;tgRender()" class="tg-sel" title="Baris per halaman">
+            <option value="10">10 / hal</option><option value="25" selected>25 / hal</option><option value="50">50 / hal</option><option value="100">100 / hal</option>
+          </select>
+          <button id="tg-btn-bulk" onclick="tgKirimTerpilih()" class="btn-p" style="background:#16a34a"><i class="fa-brands fa-whatsapp"></i> <span>Kirim WA ke Terpilih (<span id="tg-sel">0</span>)</span></button>
+          <button id="tg-btn-lunas" onclick="tgHapusLunas()" class="hidden text-xs font-bold text-slate-500 hover:text-rose-600"><i class="fa fa-broom mr-1"></i>Hapus yang lunas</button>
+          <button onclick="tgHapusSemua()" class="text-xs font-bold text-rose-600 hover:underline"><i class="fa fa-trash mr-1"></i>Kosongkan semua bulan</button>
+        </div>
+        <div id="tg-bulk" class="hidden tg-bulk">
+          <span><b id="tg-bulk-n">0</b> data dipilih</span>
+          <span id="tg-bulk-info" class="text-[11px] opacity-80"></span>
+          <span class="ml-auto flex flex-wrap gap-2">
+            <button type="button" onclick="tgKirimTerpilih()" class="sh-btn wa"><i class="fa-brands fa-whatsapp"></i> Kirim WA</button>
+            <button type="button" onclick="tgHapusTerpilih()" class="sh-btn del-solid"><i class="fa fa-trash"></i> Hapus terpilih</button>
+            <button type="button" onclick="tgPilih.clear();tgRender()" class="sh-btn">Batal pilih</button>
+          </span>
+        </div>
+        <div id="tg-progress" class="hidden px-5 py-3 bg-emerald-50 text-emerald-700 text-xs font-bold flex items-center gap-3">
+          <span id="tg-progress-txt"></span>
+          <button onclick="tgBatalAntrean()" class="ml-auto text-rose-600 underline">Hentikan antrean</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="data-table tg-table">
+            <thead><tr>
+              <th style="width:36px"><input type="checkbox" id="tg-all" onchange="tgPilihSemua(this.checked)" title="Pilih semua data pada tampilan ini"></th>
+              <th class="tg-th" onclick="tgSort('id_pelanggan')">IDPEL<i class="fa fa-sort" data-k="id_pelanggan"></i></th>
+              <th class="tg-th" onclick="tgSort('nama')">Nama<i class="fa fa-sort" data-k="nama"></i></th>
+              <th class="tg-th" onclick="tgSort('no_hp')">No. WA<i class="fa fa-sort" data-k="no_hp"></i></th>
+              <th class="tg-th" onclick="tgSort('periode')">Periode<i class="fa fa-sort" data-k="periode"></i></th>
+              <th class="tg-th" onclick="tgSort('nominal')">Tagihan<i class="fa fa-sort" data-k="nominal"></i></th>
+              <th class="tg-th" onclick="tgSort('jatuh_tempo')">Jatuh tempo<i class="fa fa-sort" data-k="jatuh_tempo"></i></th>
+              <th class="tg-th" onclick="tgSort('hari')">Terlambat<i class="fa fa-sort" data-k="hari"></i></th>
+              <th class="tg-th" onclick="tgSort('kategori')">Pembayaran<i class="fa fa-sort" data-k="kategori"></i></th>
+              <th class="tg-th" onclick="tgSort('wa_status')">Status WA<i class="fa fa-sort" data-k="wa_status"></i></th>
+              <th class="text-center">Aksi</th>
+            </tr></thead>
+            <tbody id="tg-body"><tr><td colspan="11" class="text-center py-10 text-slate-400">Belum ada data. Upload file Excel terlebih dahulu.</td></tr></tbody>
+          </table>
+        </div>
+        <div id="tg-pager" class="tg-pager"></div>
+      </div>
+    </section>
+
+    <!-- PAGE: RIWAYAT PESAN WA (Admin Only) -->
+    <section id="page-analitik" class="page space-y-6">
+      <div class="tg-hero">
+        <div class="relative z-10">
+          <h2 class="text-xl font-extrabold tracking-tight"><i class="fa fa-chart-line mr-2 text-sky-300"></i>Analitik &amp; Laporan Penagihan</h2>
+          <p class="text-xs text-blue-100 mt-1.5 max-w-xl leading-relaxed">Pantau tren tunggakan per bulan, tingkat baca dan balasan WhatsApp, serta template mana yang paling efektif. Unduh sebagai laporan untuk atasan.</p>
+        </div>
+        <div class="relative z-10 flex flex-wrap gap-2">
+          <button type="button" onclick="anUnduh('excel')" class="tg-hero-btn"><i class="fa fa-file-excel"></i>Laporan Excel</button>
+          <button type="button" onclick="anUnduh('pdf')" class="tg-hero-btn"><i class="fa fa-file-pdf"></i>Laporan PDF</button>
+          <button type="button" onclick="loadAnalitik()" class="tg-hero-btn" title="Muat ulang"><i class="fa fa-rotate"></i></button>
+        </div>
+      </div>
+
+      <div id="an-empty" class="hidden tg-card text-center py-12 text-slate-400">
+        <i class="fa fa-chart-simple text-3xl mb-3 opacity-40"></i>
+        <p class="font-bold text-slate-500">Belum ada data untuk dianalisis</p>
+        <p class="text-xs mt-1">Upload file tunggakan di menu <b>Impor Tunggakan</b> terlebih dahulu.</p>
+      </div>
+
+      <div id="an-body" class="space-y-6">
+        <div id="an-chips" class="tg-per-bar"></div>
+        <div id="an-kpi" class="tg-stats"></div>
+
+        <div class="grid lg:grid-cols-2 gap-6">
+          <div id="an-sec-trend" class="tg-card">
+            <p class="tg-card-t mb-1"><i class="fa fa-arrow-trend-up text-amber-500"></i>Tren tunggakan &amp; pelunasan</p>
+            <p class="text-[11px] text-slate-400 mb-3">Batang: nominal belum lunas (juta Rp). Garis: % pelanggan lunas. Klik titik untuk memilih bulan.</p>
+            <div style="height:260px"><canvas id="an-c-trend"></canvas></div>
+          </div>
+          <div id="an-sec-wa" class="tg-card">
+            <p class="tg-card-t mb-1"><i class="fa-brands fa-whatsapp text-emerald-500"></i>Jangkauan pesan WhatsApp</p>
+            <p class="text-[11px] text-slate-400 mb-3">Batang: pesan terkirim. Garis: % dibalas.</p>
+            <div style="height:260px"><canvas id="an-c-wa"></canvas></div>
+            <p id="an-wa-note" class="hidden text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3"><i class="fa fa-triangle-exclamation mr-1"></i>Persentase dibalas belum terisi karena webhook Fonnte belum aktif. Pasang webhook (lihat README) agar status Diterima dan Balasan tercatat.</p>
+          </div>
+        </div>
+
+        <div id="an-sec-bulan" class="tg-card !p-0 overflow-hidden">
+          <div class="p-5 pb-3"><p class="tg-card-t"><i class="fa fa-table-columns text-blue-500"></i>Perbandingan antarbulan <span class="text-xs font-normal text-slate-400">klik baris untuk memilih bulan</span></p></div>
+          <div class="overflow-x-auto"><table class="data-table tg-table">
+            <thead><tr><th>Periode</th><th class="text-right">Pelanggan</th><th class="text-right">Lunas</th><th class="text-right">Menunggak</th><th class="text-right">Nominal belum lunas</th><th>% Lunas</th><th class="text-right">WA terkirim</th><th class="text-right">% Dibalas</th></tr></thead>
+            <tbody id="an-tb-bulan"></tbody>
+          </table></div>
+        </div>
+
+        <div id="an-sec-tpl" class="tg-card !p-0 overflow-hidden">
+          <div class="p-5 pb-3"><p class="tg-card-t"><i class="fa fa-trophy text-amber-500"></i>Efektivitas template WhatsApp</p>
+            <p class="text-[11px] text-slate-400 mt-1">Konversi = pelanggan yang lunas setelah menerima template itu (template terakhir sebelum lunas).</p></div>
+          <div class="overflow-x-auto"><table class="data-table tg-table">
+            <thead><tr><th>Template</th><th class="text-right">Pesan</th><th class="text-right">Pelanggan</th><th class="text-right">% Dibalas</th><th class="text-right">Lunas setelahnya</th><th style="min-width:190px">Konversi</th><th class="text-right">Rata-rata ke lunas</th></tr></thead>
+            <tbody id="an-tb-tpl"></tbody>
+          </table></div>
+          <p id="an-tpl-note" class="px-5 py-3 text-[11px] text-slate-400 border-t border-slate-100"></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-riwayat" class="page space-y-6">
+      <div class="tg-hero">
+        <div class="relative z-10">
+          <h2 class="text-xl font-extrabold tracking-tight"><i class="fa fa-clock-rotate-left mr-2 text-emerald-300"></i>Riwayat Pesan WhatsApp</h2>
+          <p class="text-xs text-blue-100 mt-1.5 max-w-xl leading-relaxed">Pantau setiap pesan yang dikirim: terkirim, diterima, dibaca, hingga balasan pelanggan.</p>
+        </div>
+        <div class="relative z-10 flex flex-wrap gap-2">
+          <button type="button" id="rw-hapus-btn" onclick="rwHapusTerpilih()" class="tg-hero-btn hidden" style="background:rgba(225,29,72,.85)"><i class="fa fa-trash"></i><span id="rw-hapus-n">Hapus terpilih</span></button>
+          <button type="button" onclick="rwEksporCsv()" class="tg-hero-btn"><i class="fa fa-file-csv"></i>Ekspor tampilan</button>
+          <button type="button" onclick="loadRiwayat()" class="tg-hero-btn" title="Muat ulang"><i class="fa fa-rotate"></i></button>
+        </div>
+      </div>
+      <div id="rw-stats" class="tg-stats"></div>
+      <div class="tg-card !p-0 overflow-hidden">
+        <div class="p-5 flex flex-wrap items-center gap-3">
+          <div class="tg-search" style="min-width:260px"><i class="fa fa-magnifying-glass"></i><input id="rw-q" onkeydown="if(event.key==='Enter')loadRiwayat()" placeholder="Cari IDPEL / nama / nomor WA..."></div>
+          <select id="rw-status" onchange="rwSetSt(this.value)" class="tg-sel">
+            <option value="">Semua status</option><option value="TERKIRIM">Terkirim</option><option value="DITERIMA">Diterima</option>
+            <option value="GAGAL">Gagal</option><option value="ANTRE">Antre</option><option value="BALASAN">Ada balasan</option>
+          </select>
+          <button onclick="loadRiwayat()" class="btn-p"><i class="fa fa-magnifying-glass"></i> Cari</button>
+          <span id="rw-count" class="tg-pill ml-auto" style="background:#d1fae5;color:#047857">0</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="data-table tg-table">
+            <thead><tr><th style="width:36px"><input type="checkbox" id="rw-all" onclick="rwPilihSemua(this.checked)" title="Pilih semua yang tampil"></th><th>Waktu kirim</th><th>IDPEL</th><th>Nama</th><th>No. WA</th><th>Template</th><th>Status</th><th>Balasan</th><th class="text-center">Pesan</th></tr></thead>
+            <tbody id="rw-body"><tr><td colspan="10" class="text-center py-10 text-slate-400">Memuat riwayat...</td></tr></tbody>
+          </table>
+        </div>
+        <p class="px-5 py-3 text-[11px] text-slate-400 border-t border-slate-100">Status <b>Diterima</b> dan <b>Balasan</b> terisi otomatis bila webhook Fonnte sudah dipasang (lihat README). Tanpa webhook, status berhenti di <b>Terkirim</b>. Klik baris untuk melihat isi pesan lengkap. Centang pesan lalu klik <b>Hapus terpilih</b>, atau pakai ikon tempat sampah per baris. Yang dihapus hanya catatan di sini, pesan WhatsApp yang sudah terkirim tidak ditarik.</p>
+      </div>
+    </section>
+
+    <!-- PAGE: KOTAK MASUK BALASAN WA -->
+    <section id="page-inbox" class="page space-y-6">
+      <div class="tg-hero">
+        <div class="relative z-10">
+          <h2 class="text-xl font-extrabold tracking-tight"><i class="fa fa-inbox mr-2 text-purple-300"></i>Kotak Masuk Balasan WhatsApp</h2>
+          <p class="text-xs text-blue-100 mt-1.5 max-w-xl leading-relaxed">Daftar balasan dari pelanggan yang masuk melalui webhook Fonnte. Klik <b>Riwayat</b> untuk melihat percakapan lengkap.</p>
+        </div>
+        <div class="relative z-10 flex flex-wrap gap-2">
+          <button type="button" onclick="loadInbox()" class="tg-hero-btn"><i class="fa fa-rotate"></i>Muat ulang</button>
+        </div>
+      </div>
+
+      <div class="tg-card !p-0 overflow-hidden">
+        <div class="p-5 flex flex-wrap items-center gap-3 border-b border-slate-100">
+          <p class="tg-card-t !mb-0"><i class="fa fa-reply text-purple-500 mr-2"></i>Balasan Pelanggan</p>
+          <span id="inbox-count" class="tg-pill ml-auto" style="background:#f3e8ff;color:#7e22ce">0 balasan</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="data-table tg-table">
+            <thead><tr><th>Waktu Balasan</th><th>IDPEL</th><th>Nama</th><th>No. WA</th><th>Isi Balasan</th><th class="text-center">Aksi</th></tr></thead>
+            <tbody id="inbox-body"><tr><td colspan="6" class="text-center py-10 text-slate-400">Memuat balasan...</td></tr></tbody>
+          </table>
+        </div>
+        <p class="px-5 py-3 text-[11px] text-slate-400 border-t border-slate-100">Balasan masuk otomatis bila webhook Fonnte sudah dipasang di server. Kolom <b>balasan</b> di tabel <b>wa_riwayat</b> menyimpan isi pesan balik dari pelanggan.</p>
+      </div>
+    </section>
+
+    <!-- PAGE: KELOLA PETUGAS (Admin Only) -->
+    <section id="page-users" class="page space-y-6">
+      <div class="tg-hero">
+        <div class="relative z-10">
+          <h2 class="text-xl font-extrabold tracking-tight"><i class="fa fa-users-gear mr-2 text-orange-300"></i>Kelola Petugas</h2>
+          <p class="text-xs text-blue-100 mt-1.5 max-w-xl leading-relaxed">Setujui atau tolak akun petugas baru, suspend akun, dan proses permintaan reset password dari petugas.</p>
+        </div>
+        <div class="relative z-10 flex flex-wrap gap-2">
+          <button type="button" onclick="loadUsers()" class="tg-hero-btn"><i class="fa fa-rotate"></i>Muat ulang</button>
+        </div>
+      </div>
+
+      <div class="tg-card !p-0 overflow-hidden">
+        <div class="p-5 flex flex-wrap items-center gap-3 border-b border-slate-100">
+          <p class="tg-card-t !mb-0"><i class="fa fa-users text-orange-500 mr-2"></i>Daftar Akun Petugas</p>
+          <span id="usr-pending-badge" class="hidden tg-pill ml-auto" style="background:#fef3c7;color:#92400e">0 menunggu</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="data-table tg-table">
+            <thead><tr><th>Nama / Username</th><th>No. HP</th><th>Role</th><th>Status</th><th>Terdaftar</th><th class="text-center">Aksi Akun</th><th class="text-center">Password</th></tr></thead>
+            <tbody id="usr-body"><tr><td colspan="7" class="text-center py-10 text-slate-400">Memuat daftar petugas...</td></tr></tbody>
+          </table>
+        </div>
+        <p class="px-5 py-3 text-[11px] text-slate-400 border-t border-slate-100">Akun baru berstatus <b>pending</b> sampai disetujui admin. Password direset ke nilai default berupa username masing-masing akun.</p>
+      </div>
+    </section>
+
+    <!-- Panel detail (geser dari kanan): dipakai halaman Tunggakan & Riwayat -->
+    <div id="sheet-ov" class="sheet-ov" onclick="sheetTutup()"></div>
+    <aside id="sheet" class="sheet" aria-hidden="true">
+      <div class="sheet-h">
+        <div id="sheet-head" class="flex items-center gap-3 min-w-0 flex-1"></div>
+        <button type="button" onclick="sheetTutup()" class="sheet-x" aria-label="Tutup"><i class="fa fa-xmark"></i></button>
+      </div>
+      <div id="sheet-body" class="sheet-b"></div>
+      <div id="sheet-foot" class="sheet-f"></div>
+    </aside>
+
+    <!-- Modal pratinjau pesan WA -->
+    <div id="tg-modal" class="hidden fixed inset-0 z-[250] bg-black/50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center">
+          <p class="font-bold text-slate-800 text-sm"><i class="fa-brands fa-whatsapp text-emerald-500 mr-2"></i>Pratinjau pesan ke <span id="tg-m-nama"></span></p>
+          <button onclick="tgTutupModal()" class="ml-auto text-slate-400 hover:text-slate-700"><i class="fa fa-xmark"></i></button>
+        </div>
+        <div class="p-5 overflow-y-auto">
+          <p class="text-[11px] text-slate-500 mb-2">Tujuan: <b id="tg-m-hp"></b></p>
+          <pre id="tg-m-pesan" class="text-sm bg-emerald-50 border border-emerald-100 rounded-xl p-4 whitespace-pre-wrap font-sans"></pre>
+        </div>
+        <div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-3">
+          <button onclick="tgTutupModal()" class="px-4 py-2 text-sm font-semibold text-slate-500">Batal</button>
+          <button id="tg-m-kirim" class="btn-p" style="background:#16a34a"><i class="fa fa-paper-plane"></i> Kirim WA Sekarang</button>
+        </div>
+      </div>
+    </div>
+
+      </div><!-- /content-wrapper -->
+</div><!-- /main-content -->
+</div><!-- /flex -->
+
+<div id="toast-container" class="fixed bottom-6 right-6 z-[300] flex flex-col gap-3 pointer-events-none"></div>
+
+<script>window.SWACAM={app:"penagihan",otherUrl:""};</script>
+<script src="/static/app.js?v=1791529002"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "PLN S2JB - Penagihan & WA",
+  "short_name": "S2JB Tagih",
+  "description": "Aplikasi penagihan tunggakan dan WhatsApp PLN S2JB",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#001a3d",
+  "theme_color": "#002060",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/logo-pln.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/logo-pln.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["utilities", "productivity"],
+  "lang": "id",
+  "dir": "ltr"
+}

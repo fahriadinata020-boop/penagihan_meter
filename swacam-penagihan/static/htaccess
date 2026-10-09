@@ -1,0 +1,7 @@
+# Opsional - hanya untuk Apache (XAMPP/hosting berbasis Apache)
+DirectoryIndex index.php
+
+# Supaya file .env / config sensitif tidak bisa diakses langsung dari browser
+<FilesMatch "\.(env|json)$">
+    Require all denied
+</FilesMatch>
