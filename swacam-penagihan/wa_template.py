@@ -132,6 +132,12 @@ def pilih_otomatis(row: dict, mx_esk: Optional[int], templates: List[dict],
                    jendela: dict) -> Tuple[Optional[dict], Optional[str]]:
     """Return (template, alasan_ditolak). Tepat salah satu yang terisi."""
     by_tahap = {t["tahap"]: t for t in templates}
+    today_day = datetime.date.today().day
+
+    # Bila hari ini masih tanggal 2 s/d 20 (masa periode pembayaran), prioritaskan template pengingat masa pembayaran
+    if today_day <= 20 and 0 in by_tahap:
+        return by_tahap[0], None
+
     sel = hari_selisih(row)
     if sel <= 0:
         if 0 not in by_tahap:
