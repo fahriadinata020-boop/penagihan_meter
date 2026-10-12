@@ -35,22 +35,44 @@ MAX_BARIS = 20000
 BULAN_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
             "Agustus", "September", "Oktober", "November", "Desember"]
 
-PESAN_DEFAULT = (
-    "Yth. Bapak/Ibu Pelanggan PLN, {nama} dengan ID Pelanggan {idpel}.\n\n"
-    "Sebagai bentuk pelayanan terbaik, kami mengingatkan bahwa periode pembayaran "
-    "tagihan listrik berlangsung setiap tanggal 2 hingga tanggal 20 setiap bulan.\n\n"
-    "Kami menghimbau Bapak/Ibu untuk melakukan pembayaran sebelum tanggal 20 melalui "
-    "kanal pembayaran resmi seperti PLN Mobile maupun gerai pembayaran lainnya.\n\n"
-    "Apabila hingga melewati tanggal 20 tagihan listrik belum diselesaikan, maka sesuai "
-    "ketentuan yang berlaku akan dilakukan pemutusan sementara aliran listrik sampai "
-    "dengan kewajiban pembayaran dipenuhi.\n\n"
-    "Terima kasih atas perhatian dan kerja sama Bapak/Ibu dalam menjaga kelancaran pelayanan kelistrikan.\n\n"
-    "Salam hormat,\n"
-    "PT PLN (Persero) UID S2JB."
-)
+def get_pesan_default(today: Optional[datetime.date] = None) -> str:
+    """Mengembalikan template pesan default yang otomatis menyesuaikan tanggal pengiriman."""
+    today = today or datetime.date.today()
+    if today.day <= 20:
+        return (
+            "Yth. Bapak/Ibu Pelanggan PLN, {nama} dengan ID Pelanggan {idpel}.\n\n"
+            "Sebagai bentuk pelayanan terbaik, kami mengingatkan bahwa periode pembayaran "
+            "tagihan listrik berlangsung setiap tanggal 2 hingga tanggal 20 setiap bulan.\n\n"
+            "Kami menghimbau Bapak/Ibu untuk melakukan pembayaran sebelum tanggal 20 melalui "
+            "kanal pembayaran resmi seperti PLN Mobile maupun gerai pembayaran lainnya.\n\n"
+            "Apabila hingga melewati tanggal 20 tagihan listrik belum diselesaikan, maka sesuai "
+            "ketentuan yang berlaku akan dilakukan pemutusan sementara aliran listrik sampai "
+            "dengan kewajiban pembayaran dipenuhi.\n\n"
+            "Terima kasih atas perhatian dan kerja sama Bapak/Ibu dalam menjaga kelancaran pelayanan kelistrikan.\n\n"
+            "Salam hormat,\n"
+            "PT PLN (Persero) UID S2JB."
+        )
+    else:
+        return (
+            "Yth. Bapak/Ibu Pelanggan PLN, {nama} ID PEL. {idpel}\n\n"
+            "Sebagai bentuk pelayanan terbaik, kami mengingatkan bahwa periode pembayaran "
+            "tagihan listrik berlangsung setiap tanggal 2 hingga tanggal 20 setiap bulan.\n\n"
+            "Kami menghimbau Bapak/Ibu untuk melakukan pembayaran sebelum tanggal 20 melalui "
+            "kanal pembayaran resmi seperti PLN Mobile maupun gerai pembayaran lainnya.\n\n"
+            f"Bapak Ibu Yth, kami informasikan bahwa hari ini telah memasuki tanggal {today.day} "
+            "akan tetapi tagihan listrik belum diselesaikan, maka sesuai ketentuan yang berlaku "
+            "akan dilakukan pemutusan sementara aliran listrik sampai dengan kewajiban pembayaran dipenuhi.\n\n"
+            "Kami mengharapkan Bapak/Ibu mempunyai back up kelistrikan cadangan seperti genset dan lain-lain.\n\n"
+            "Terima kasih atas perhatian dan kerja sama Bapak/Ibu dalam menjaga kelancaran pelayanan kelistrikan.\n\n"
+            "Salam hormat,\n"
+            "PT PLN (Persero) UID S2JB."
+        )
+
+PESAN_DEFAULT = get_pesan_default()
 
 PLACEHOLDERS = ["nama", "idpel", "periode", "tagihan", "jatuh_tempo",
-                "hari_terlambat", "alamat", "batas_tanggal", "salam", "kontak"]
+                "hari_terlambat", "alamat", "batas_tanggal", "tanggal_sekarang",
+                "hari_ini", "salam", "kontak"]
 
 
 # ─────────────────────────────────────────────────────────────
@@ -396,7 +418,13 @@ def _salam(now: datetime.datetime = None) -> str:
 
 
 def render_pesan(template: Optional[str], row: dict, batas: int = None) -> str:
-    template = (template or "").strip() or PESAN_DEFAULT
+    today_dt = datetime.date.today()
+    template = (template or "").strip() or get_pesan_default(today_dt)
+
+    # Otomatis sesuaikan jika template menyebut tanggal dan hari ini sudah lewat tgl 20
+    if today_dt.day > 20:
+        template = re.sub(r"telah memasuki tanggal \d+", f"telah memasuki tanggal {today_dt.day}", template)
+
     jt = row.get("jatuh_tempo")
     nilai = {
         "nama": (row.get("nama") or "Pelanggan").title(),
@@ -407,6 +435,10 @@ def render_pesan(template: Optional[str], row: dict, batas: int = None) -> str:
         "hari_terlambat": str(row.get("hari_terlambat") if row.get("hari_terlambat") is not None else "-"),
         "alamat": row.get("alamat") or "-",
         "batas_tanggal": str(batas or BATAS_TANGGAL_DEFAULT),
+        "tanggal_sekarang": str(today_dt.day),
+        "tanggal_hari_ini": str(today_dt.day),
+        "hari_ini": str(today_dt.day),
+        "tanggal": str(today_dt.day),
         "salam": _salam(),
         "kontak": KONTAK_PLN,
     }
@@ -467,11 +499,13 @@ class KirimPayload(PesanPayload):
 
 @router.get("/pesan-default")
 def pesan_default(user: dict = Depends(get_current_user)):
+    today_dt = datetime.date.today()
     return {
-        "template": PESAN_DEFAULT,
+        "template": get_pesan_default(today_dt),
         "placeholders": PLACEHOLDERS,
         "batas_tanggal": BATAS_TANGGAL_DEFAULT,
         "token_fonnte_terisi": bool(os.getenv("FONNTE_TOKEN", "").strip()),
+        "tanggal_hari_ini": today_dt.day,
     }
 
 

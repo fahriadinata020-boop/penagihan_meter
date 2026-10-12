@@ -263,9 +263,11 @@ def proses_payload(data: dict) -> dict:
                            "waktu_diterima=COALESCE(waktu_diterima, NOW())"}.get(state, "waktu_kirim=waktu_kirim")
                     s.execute(text(f"UPDATE wa_riwayat SET status=:st, {kol} WHERE id=:i"), {"st": state, "i": rid})
                     hasil["diperbarui"] = 1
-        # pesan masuk dari pelanggan (balasan): punya pengirim + isi, tanpa id pesan keluar
-        pengirim, isi = _angka(data.get("sender") or data.get("from")), data.get("message") or data.get("text")
-        if pengirim and isi and not fid:
+        # pesan masuk dari pelanggan (balasan): punya pengirim + isi pesan masuk
+        pengirim = _angka(data.get("sender") or data.get("pengirim") or data.get("from"))
+        isi = data.get("message") or data.get("pesan") or data.get("text")
+        # Bila state kosong/None (bukan delivery report seperti read/delivered/sent), ini adalah balasan chat
+        if pengirim and isi and (not state or state not in ("TERKIRIM", "DITERIMA", "DIBACA")):
             if pengirim.startswith("0"):
                 pengirim = "62" + pengirim[1:]
             n = s.execute(text(
@@ -282,12 +284,17 @@ def proses_payload(data: dict) -> dict:
         s.close()
 
 
+@router.get("/webhook")
+def webhook_fonnte_get():
+    """Fonnte melakukan tes handshake via GET method saat mendaftarkan Webhook."""
+    return {"status": "ok", "message": "Webhook Fonnte SWACAM siap menerima data."}
+
+
 @router.post("/webhook")
 async def webhook_fonnte(request: Request, key: str = Query("")):
     kunci = os.getenv("WA_WEBHOOK_KEY", "").strip()
-    if not kunci:
-        raise HTTPException(403, "WA_WEBHOOK_KEY belum diisi di .env, webhook dinonaktifkan.")
-    if not hmac.compare_digest(key.encode(), kunci.encode()):
+    # Hanya validasi jika kunci diset di environment/env
+    if kunci and not hmac.compare_digest(key.encode(), kunci.encode()):
         raise HTTPException(403, "Kunci webhook salah.")
     _siap()
     mentah = (await request.body()).decode("utf-8", "replace")

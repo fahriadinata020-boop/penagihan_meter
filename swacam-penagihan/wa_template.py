@@ -64,12 +64,12 @@ def ambil_template(kode: str) -> Optional[dict]:
 
 
 def jendela_pengingat(hari: datetime.date = None) -> dict:
-    """Pengingat ramah hanya boleh dikirim pada tanggal mulai..selesai (default 15-17)."""
+    """Pengingat ramah boleh dikirim pada tanggal mulai..selesai (default tanggal 2-20 masa pembayaran PLN)."""
     hari = hari or datetime.date.today()
     s = SessionLocal()
     try:
-        mulai = _pengaturan_int(s, "pengingat_awal_mulai", 15)
-        selesai = _pengaturan_int(s, "pengingat_awal_selesai", 17)
+        mulai = _pengaturan_int(s, "pengingat_awal_mulai", 2)
+        selesai = _pengaturan_int(s, "pengingat_awal_selesai", 20)
     finally:
         s.close()
     return {"mulai": mulai, "selesai": selesai, "terbuka": mulai <= hari.day <= selesai}

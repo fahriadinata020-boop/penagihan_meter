@@ -1,54 +1,13 @@
 import datetime
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Date, Text, Boolean
 from sqlalchemy.orm import declarative_base, sessionmaker
-from config import DATABASE_URL
+from config import DATABASE_URL, AUTH_DATABASE_URL
 
+# Base = tabel KHUSUS penagihan (DATABASE_URL). AuthBase = tabel bersama dengan Catat Meter (AUTH_DATABASE_URL).
 Base = declarative_base()
+AuthBase = declarative_base()
 
-class SwacamReading(Base):
-    __tablename__ = 'swacam_readings'
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    id_pelanggan = Column(String(50), nullable=True, index=True)
-    no_seri_meter = Column(String(50), nullable=True)
-    stand_meter = Column(Float, nullable=True)
-    stand_meter_raw = Column(String(50), nullable=True)
-    waktu_catat = Column(DateTime, default=datetime.datetime.now)
-    nama_file_foto = Column(String(255), nullable=False)
-    confidence_score = Column(Float, default=0.0)
-    uploader_username = Column(String(50), nullable=True)
-    status_validasi = Column(String(30), default='SUCCESS')
-    link_drive = Column(String(500), nullable=True)
-    catatan = Column(Text, nullable=True)
-    latitude = Column(Float, nullable=True)
-    longitude = Column(Float, nullable=True)
-    daya = Column(Integer, nullable=True)
-    periode_bulan = Column(String(20), nullable=True) # e.g. "2024-01"
-    pemakaian_kwh = Column(Float, nullable=True)
-    tagihan_rupiah = Column(Float, nullable=True)
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "id_pelanggan": self.id_pelanggan,
-            "no_seri_meter": self.no_seri_meter,
-            "daya": self.daya,
-            "periode_bulan": self.periode_bulan,
-            "stand_meter": self.stand_meter,
-            "stand_meter_raw": self.stand_meter_raw,
-            "pemakaian_kwh": self.pemakaian_kwh,
-            "tagihan_rupiah": self.tagihan_rupiah,
-            "waktu_catat": self.waktu_catat.strftime("%Y-%m-%d %H:%M:%S") if self.waktu_catat else None,
-            "nama_file_foto": self.nama_file_foto,
-            "confidence_score": self.confidence_score,
-            "status_validasi": self.status_validasi,
-            "link_drive": self.link_drive,
-            "catatan": self.catatan,
-            "latitude": self.latitude,
-            "longitude": self.longitude
-        }
-
-class UserAccount(Base):
+class UserAccount(AuthBase):
     __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -75,7 +34,7 @@ class UserAccount(Base):
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None
         }
 
-class AuditLog(Base):
+class AuditLog(AuthBase):
     __tablename__ = 'audit_logs'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -98,15 +57,224 @@ class AuditLog(Base):
         }
 
 
+class TunggakanPelanggan(Base):
+    """Data pelanggan menunggak hasil baca file Excel (untuk pengiriman WA manual via Fonnte)."""
+    __tablename__ = 'tunggakan_pelanggan'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    id_pelanggan = Column(String(50), nullable=False, index=True)
+    nama = Column(String(150), nullable=True)
+    no_hp = Column(String(30), nullable=True)
+    alamat = Column(String(255), nullable=True)
+    periode = Column(String(30), nullable=True)
+    nominal = Column(Float, nullable=True)
+    jatuh_tempo = Column(Date, nullable=True)
+    wa_status = Column(String(20), default='BELUM')   # BELUM | TERKIRIM | GAGAL
+    wa_waktu = Column(DateTime, nullable=True)
+    wa_respon = Column(String(255), nullable=True)
+    wa_jumlah_kirim = Column(Integer, default=0)
+    lunas_pada = Column(DateTime, nullable=True)   # kapan data ini pertama kali terbaca LUNAS (untuk analitik efektivitas template)
+    sumber_file = Column(String(150), nullable=True)   # nama file upload terakhir yang memuat data ini
+    status_bayar = Column(String(10), default='BELUM')   # BELUM | LUNAS (data lunas ikut disimpan agar seluruh isi file tampil)
+    diupload_oleh = Column(String(50), nullable=True)
+    diupload_pada = Column(DateTime, default=datetime.datetime.now)
+
+    def to_dict(self):
+        hari, sisa, kategori = None, None, "MENUNGGAK"
+        lunas = (self.status_bayar or "BELUM") == "LUNAS"
+        if lunas:
+            kategori = "LUNAS"
+        elif self.jatuh_tempo:
+            selisih = (datetime.date.today() - self.jatuh_tempo).days
+            if selisih > 0:
+                hari = selisih
+            else:
+                kategori, sisa = "BELUM_JATUH_TEMPO", -selisih + 1
+        return {
+            "id": self.id,
+            "id_pelanggan": self.id_pelanggan,
+            "nama": self.nama,
+            "no_hp": self.no_hp,
+            "alamat": self.alamat,
+            "periode": self.periode,
+            "nominal": self.nominal,
+            "jatuh_tempo": self.jatuh_tempo.strftime("%Y-%m-%d") if self.jatuh_tempo else None,
+            "hari_terlambat": hari,
+            "sisa_hari": sisa,
+            "kategori": kategori,
+            "status_bayar": "LUNAS" if lunas else "BELUM",
+            "wa_status": self.wa_status or "BELUM",
+            "wa_waktu": self.wa_waktu.strftime("%Y-%m-%d %H:%M:%S") if self.wa_waktu else None,
+            "wa_respon": self.wa_respon,
+            "wa_jumlah_kirim": self.wa_jumlah_kirim or 0,
+            "sumber_file": self.sumber_file,
+            "lunas_pada": self.lunas_pada.strftime("%Y-%m-%d %H:%M:%S") if self.lunas_pada else None,
+            "diupload_oleh": self.diupload_oleh,
+            "diupload_pada": self.diupload_pada.strftime("%Y-%m-%d %H:%M:%S") if self.diupload_pada else None,
+        }
+
+
 # pool_pre_ping: tes koneksi sebelum dipakai (hindari error 2013 'Lost connection' karena koneksi basi)
 # pool_recycle: buang koneksi lama tiap 5 menit supaya tidak diputus MySQL
 engine = create_engine(DATABASE_URL, echo=False, pool_pre_ping=True, pool_recycle=300)
 SessionLocal = sessionmaker(bind=engine)
 
+# Koneksi ke database Catat Meter (swacam_db): hanya untuk users & audit_logs
+auth_engine = create_engine(AUTH_DATABASE_URL, echo=False, pool_pre_ping=True, pool_recycle=300)
+AuthSessionLocal = sessionmaker(bind=auth_engine)
+
+def _ensure_database(url: str):
+    """Buat database MySQL-nya bila belum ada (supaya tidak error 'Unknown database')."""
+    from sqlalchemy.engine import make_url
+    u = make_url(url)
+    nama = u.database
+    if not nama:
+        return
+    try:
+        tmp = create_engine(u.set(database=None))
+        with tmp.connect() as c:
+            c.execute(__import__("sqlalchemy").text(
+                f"CREATE DATABASE IF NOT EXISTS `{nama}` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
+            c.commit()
+        tmp.dispose()
+    except Exception as e:
+        print(f"[DB] Tidak bisa memastikan database '{nama}' ada: {e}")
+
+
+def _create_wa_tables():
+    from sqlalchemy import inspect, text
+    insp = inspect(engine)
+    tabel = set(insp.get_table_names())
+    with engine.connect() as conn:
+        if 'wa_batch' not in tabel:
+            conn.execute(text('''
+                CREATE TABLE wa_batch (
+                  id int(11) NOT NULL AUTO_INCREMENT,
+                  status varchar(15) NOT NULL DEFAULT 'MENUNGGU',
+                  jenis varchar(15) NOT NULL DEFAULT 'TAGIHAN',
+                  jeda_detik int(11) NOT NULL DEFAULT 8,
+                  total int(11) NOT NULL DEFAULT 0,
+                  terkirim int(11) NOT NULL DEFAULT 0,
+                  gagal int(11) NOT NULL DEFAULT 0,
+                  dilewati int(11) NOT NULL DEFAULT 0,
+                  dibuat_oleh varchar(50) NOT NULL,
+                  dibuat_pada datetime DEFAULT current_timestamp(),
+                  mulai_pada datetime DEFAULT NULL,
+                  selesai_pada datetime DEFAULT NULL,
+                  catatan varchar(255) DEFAULT NULL,
+                  PRIMARY KEY (id)
+                )
+            '''))
+        if 'wa_antrean' not in tabel:
+            conn.execute(text('''
+                CREATE TABLE wa_antrean (
+                  id int(11) NOT NULL AUTO_INCREMENT,
+                  batch_id int(11) NOT NULL,
+                  tunggakan_id int(11) DEFAULT NULL,
+                  id_pelanggan varchar(50) NOT NULL,
+                  no_hp varchar(30) NOT NULL,
+                  template_kode varchar(40) DEFAULT NULL,
+                  pesan text NOT NULL,
+                  status varchar(12) NOT NULL DEFAULT 'MENUNGGU',
+                  percobaan tinyint(4) NOT NULL DEFAULT 0,
+                  jadwal_kirim datetime DEFAULT NULL,
+                  diproses_pada datetime DEFAULT NULL,
+                  respon varchar(255) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  CONSTRAINT fk_wa_antrean_batch FOREIGN KEY (batch_id) REFERENCES wa_batch (id) ON DELETE CASCADE
+                )
+            '''))
+        if 'wa_riwayat' not in tabel:
+            conn.execute(text('''
+                CREATE TABLE wa_riwayat (
+                  id int(11) NOT NULL AUTO_INCREMENT,
+                  id_pelanggan varchar(50) NOT NULL,
+                  nama varchar(150) DEFAULT NULL,
+                  tunggakan_id int(11) DEFAULT NULL,
+                  batch_id int(11) DEFAULT NULL,
+                  no_hp varchar(30) NOT NULL,
+                  periode varchar(30) DEFAULT NULL,
+                  nominal float DEFAULT NULL,
+                  template_kode varchar(40) DEFAULT NULL,
+                  tahap tinyint(4) DEFAULT NULL,
+                  pesan text DEFAULT NULL,
+                  status varchar(12) NOT NULL DEFAULT 'ANTRE',
+                  fonnte_id varchar(60) DEFAULT NULL,
+                  respon varchar(255) DEFAULT NULL,
+                  dikirim_oleh varchar(50) DEFAULT NULL,
+                  waktu_kirim datetime DEFAULT current_timestamp(),
+                  waktu_diterima datetime DEFAULT NULL,
+                  waktu_dibaca datetime DEFAULT NULL,
+                  balasan text DEFAULT NULL,
+                  waktu_balasan datetime DEFAULT NULL,
+                  PRIMARY KEY (id)
+                )
+            '''))
+        if 'wa_template' not in tabel:
+            conn.execute(text('''
+                CREATE TABLE wa_template (
+                  kode varchar(40) NOT NULL,
+                  nama varchar(100) NOT NULL,
+                  tahap tinyint(4) NOT NULL,
+                  hari_min int(11) NOT NULL,
+                  hari_max int(11) DEFAULT NULL,
+                  isi text NOT NULL,
+                  aktif tinyint(1) NOT NULL DEFAULT 1,
+                  diubah_oleh varchar(50) DEFAULT NULL,
+                  diubah_pada datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+                  PRIMARY KEY (kode)
+                )
+            '''))
+            # Insert default templates
+            conn.execute(text('''
+                INSERT INTO wa_template (kode, nama, tahap, hari_min, hari_max, isi, aktif) VALUES 
+                ('PENGINGAT_1', 'Pengingat Pertama', 1, 1, NULL, 'Yth. Bapak/Ibu Pelanggan PLN, {nama} ID PEL. {idpel}\n\nSebagai bentuk pelayanan terbaik, kami mengingatkan bahwa periode pembayaran tagihan listrik berlangsung setiap tanggal 2 hingga tanggal 20 setiap bulan.\n\nKami menghimbau Bapak/Ibu untuk melakukan pembayaran sebelum tanggal 20 melalui kanal pembayaran resmi seperti PLN Mobile maupun gerai pembayaran lainnya.\n\nBapak Ibu Yth, kami informasikan bahwa hari ini telah memasuki tanggal 21 akan tetapi tagihan listrik belum diselesaikan, maka sesuai ketentuan yang berlaku akan dilakukan pemutusan sementara aliran listrik sampai dengan kewajiban pembayaran dipenuhi.\n\nKami mengharapkan Bapak/Ibu mempunyai back up kelistrikan cadangan seperti genset dan lain-lain.\n\nTerima kasih atas perhatian dan kerja sama Bapak/Ibu dalam menjaga kelancaran pelayanan kelistrikan.\n\nSalam hormat,\nPT PLN (Persero) UID S2JB.', 1),
+                ('PENGINGAT_RAMAH', 'Pengingat Ramah', 0, -5, -1, 'Yth. Bapak/Ibu Pelanggan PLN, {nama} dengan ID Pelanggan {idpel}.\n\nSebagai bentuk pelayanan terbaik, kami mengingatkan bahwa periode pembayaran tagihan listrik berlangsung setiap tanggal 2 hingga tanggal 20 setiap bulan.\n\nKami menghimbau Bapak/Ibu untuk melakukan pembayaran sebelum tanggal 20 melalui kanal pembayaran resmi seperti PLN Mobile maupun gerai pembayaran lainnya.\n\nApabila hingga melewati tanggal 20 tagihan listrik belum diselesaikan, maka sesuai ketentuan yang berlaku akan dilakukan pemutusan sementara aliran listrik sampai dengan kewajiban pembayaran dipenuhi.\n\nTerima kasih atas perhatian dan kerja sama Bapak/Ibu dalam menjaga kelancaran pelayanan kelistrikan.\n\nSalam hormat,\nPT PLN (Persero) UID S2JB.', 1)
+            '''))
+        if 'wa_webhook_log' not in tabel:
+            conn.execute(text('''
+                CREATE TABLE wa_webhook_log (
+                  id int(11) NOT NULL AUTO_INCREMENT,
+                  diterima datetime DEFAULT current_timestamp(),
+                  fonnte_id varchar(60) DEFAULT NULL,
+                  state varchar(30) DEFAULT NULL,
+                  payload mediumtext NOT NULL,
+                  diproses tinyint(1) NOT NULL DEFAULT 0,
+                  PRIMARY KEY (id)
+                )
+            '''))
+        if 'pengaturan' not in tabel:
+            conn.execute(text('''
+                CREATE TABLE pengaturan (
+                  kunci varchar(60) NOT NULL,
+                  nilai varchar(255) NOT NULL,
+                  keterangan varchar(255) DEFAULT NULL,
+                  diubah_oleh varchar(50) DEFAULT NULL,
+                  diubah_pada datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+                  PRIMARY KEY (kunci)
+                )
+            '''))
+            conn.execute(text('''
+                INSERT INTO pengaturan VALUES 
+                ('antrean_maks_percobaan','2','Percobaan ulang otomatis bila Fonnte gagal (#1)',NULL,NOW()),
+                ('jeda_antar_pesan_detik','8','Jeda antar pesan di antrean server (#1)',NULL,NOW()),
+                ('jeda_minimum_jam','24','Jeda minimum kirim ke pelanggan yang sama; 0 = nonaktif (#6)',NULL,NOW()),
+                ('pengingat_awal_mulai','15','Pengingat ramah boleh dikirim mulai tanggal ini (#4)',NULL,NOW()),
+                ('pengingat_awal_selesai','17','Pengingat ramah boleh dikirim sampai tanggal ini (#4)',NULL,NOW())
+            '''))
+        conn.commit()
+
 def init_db():
     """Membuat tabel database jika belum ada, dan migrasi kolom baru jika diperlukan."""
-    Base.metadata.create_all(bind=engine)
+    _ensure_database(DATABASE_URL)
+    Base.metadata.create_all(bind=engine)          # tabel penagihan -> swacam_penagihan_db
+    AuthBase.metadata.create_all(bind=auth_engine) # users & audit_logs -> swacam_db (dibuat hanya bila belum ada)
     _migrate_missing_columns()
+    try:
+        _migrate_modul_wa()
+        _create_wa_tables()
+    except Exception as e:
+        print(f"[DB MIGRATION] modul WA dilewati: {e}")
     seed_default_users()
 
 def _hash_pw(password: str) -> str:
@@ -120,7 +288,7 @@ def seed_default_users():
         ("admin", "admin123", "admin", "Administrator PLN"),
         ("petugas", "petugas123", "petugas", "Petugas Pencatat Meter"),
     ]
-    session = SessionLocal()
+    session = AuthSessionLocal()
     try:
         for uname, pw, role, name in defaults:
             if not session.query(UserAccount).filter(UserAccount.username == uname).first():
@@ -137,7 +305,7 @@ def seed_default_users():
 def ensure_user_row(u: dict) -> bool:
     """Jika akun (mis. admin/petugas bawaan) belum ada di tabel users, buatkan barisnya
     supaya update profil selalu tersimpan di database."""
-    session = SessionLocal()
+    session = AuthSessionLocal()
     try:
         if session.query(UserAccount).filter(UserAccount.username == u["username"].lower()).first():
             return True
@@ -153,9 +321,32 @@ def ensure_user_row(u: dict) -> bool:
         return False
     finally:
         session.close()
+def update_user_basic_profile(old_username: str, new_username: str, full_name: str) -> bool:
+    session = AuthSessionLocal()
+    try:
+        user = session.query(UserAccount).filter(UserAccount.username == old_username).first()
+        if not user: return False
+        
+        # Cek jika username baru sudah ada dan bukan milik user ini
+        if new_username.lower() != old_username.lower():
+            cek = session.query(UserAccount).filter(UserAccount.username == new_username.lower()).first()
+            if cek: raise ValueError("Username sudah digunakan")
+            user.username = new_username.lower()
+            
+        user.full_name = full_name
+        session.commit()
+        return True
+    except ValueError as e:
+        raise
+    except Exception:
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
 
 def update_user_password(username: str, new_password: str) -> bool:
-    session = SessionLocal()
+    session = AuthSessionLocal()
     try:
         user = session.query(UserAccount).filter(UserAccount.username == username.lower()).first()
         if not user:
@@ -173,31 +364,13 @@ def _migrate_missing_columns():
     """Menambahkan kolom baru ke tabel lama (mis. latitude/longitude) tanpa menghapus data yang sudah ada."""
     from sqlalchemy import inspect, text
 
-    inspector = inspect(engine)
-    existing_columns = {col["name"] for col in inspector.get_columns("swacam_readings")}
-
-    expected_columns = {
-        "latitude": "FLOAT",
-        "longitude": "FLOAT",
-        "no_seri_meter": "VARCHAR(50)",
-        "daya": "INTEGER",
-        "periode_bulan": "VARCHAR(20)",
-        "pemakaian_kwh": "FLOAT",
-        "tagihan_rupiah": "FLOAT"
-    }
-
-    with engine.connect() as conn:
-        for col_name, col_type in expected_columns.items():
-            if col_name not in existing_columns:
-                conn.execute(text(f"ALTER TABLE swacam_readings ADD COLUMN {col_name} {col_type}"))
-                conn.commit()
-                print(f"[DB MIGRATION] Kolom '{col_name}' berhasil ditambahkan ke tabel swacam_readings.")
+    inspector = inspect(auth_engine)
 
     # Migrasi tabel users (mis. reset_requested untuk fitur Lupa Password)
     if "users" in inspector.get_table_names():
         existing_user_columns = {col["name"] for col in inspector.get_columns("users")}
         expected_user_columns = {"reset_requested": "BOOLEAN DEFAULT 0", "phone_number": "VARCHAR(20)", "foto_profil": "VARCHAR(255)"}
-        with engine.connect() as conn:
+        with auth_engine.connect() as conn:
             for col_name, col_type in expected_user_columns.items():
                 if col_name not in existing_user_columns:
                     try:
@@ -208,172 +381,72 @@ def _migrate_missing_columns():
                         conn.rollback()
                         print(f"[DB MIGRATION ERROR] Gagal menambah kolom users.{col_name}: {e}. "
                               f"Jalankan manual: ALTER TABLE users ADD COLUMN {col_name} {col_type};")
+def _migrate_modul_wa():
+    """Kolom tambahan modul tunggakan/WA: status_bayar (data lunas ikut tampil) dan nama di riwayat WA
+    (supaya nama tidak hilang saat daftar tunggakan diganti oleh upload baru)."""
+    from sqlalchemy import inspect, text
+    import re
+    insp = inspect(engine)
+    tabel = set(insp.get_table_names())
+    with engine.connect() as conn:
+        if "tunggakan_pelanggan" in tabel:
+            kol = {c["name"] for c in insp.get_columns("tunggakan_pelanggan")}
+            if "lunas_pada" not in kol:
+                try:
+                    conn.execute(text("ALTER TABLE tunggakan_pelanggan ADD COLUMN lunas_pada DATETIME NULL"))
+                    conn.execute(text("UPDATE tunggakan_pelanggan SET lunas_pada=COALESCE(diupload_pada, NOW()) "
+                                      "WHERE status_bayar='LUNAS' AND lunas_pada IS NULL"))
+                    conn.commit()
+                    print("[DB MIGRATION] Kolom 'lunas_pada' ditambahkan ke tunggakan_pelanggan.")
+                except Exception as e:
+                    conn.rollback()
+                    print(f"[DB MIGRATION ERROR] tunggakan_pelanggan.lunas_pada: {e}")
+            if "sumber_file" not in kol:
+                try:
+                    conn.execute(text("ALTER TABLE tunggakan_pelanggan ADD COLUMN sumber_file VARCHAR(150) NULL"))
+                    conn.commit()
+                    print("[DB MIGRATION] Kolom 'sumber_file' ditambahkan ke tunggakan_pelanggan.")
+                except Exception as e:
+                    conn.rollback()
+                    print(f"[DB MIGRATION ERROR] tunggakan_pelanggan.sumber_file: {e}")
+            if "status_bayar" not in kol:
+                try:
+                    conn.execute(text("ALTER TABLE tunggakan_pelanggan ADD COLUMN status_bayar VARCHAR(10) NOT NULL DEFAULT 'BELUM'"))
+                    conn.commit()
+                    print("[DB MIGRATION] Kolom 'status_bayar' ditambahkan ke tunggakan_pelanggan.")
+                except Exception as e:
+                    conn.rollback()
+                    print(f"[DB MIGRATION ERROR] tunggakan_pelanggan.status_bayar: {e}")
+        if "wa_riwayat" in tabel:
+            kol = {c["name"] for c in insp.get_columns("wa_riwayat")}
+            if "nama" not in kol:
+                try:
+                    conn.execute(text("ALTER TABLE wa_riwayat ADD COLUMN nama VARCHAR(150) NULL AFTER id_pelanggan"))
+                    conn.commit()
+                    print("[DB MIGRATION] Kolom 'nama' ditambahkan ke wa_riwayat.")
+                except Exception as e:
+                    conn.rollback()
+                    print(f"[DB MIGRATION ERROR] wa_riwayat.nama: {e}")
+                    return
+            # isi nama untuk riwayat lama: dari daftar tunggakan, lalu dari teks pesan ("Bapak/Ibu <Nama>.")
+            try:
+                conn.execute(text("UPDATE wa_riwayat r JOIN tunggakan_pelanggan t ON t.id_pelanggan=r.id_pelanggan "
+                                  "SET r.nama=t.nama WHERE (r.nama IS NULL OR r.nama='') AND t.nama IS NOT NULL AND t.nama<>''"))
+                conn.commit()
+                sisa = conn.execute(text("SELECT id, pesan FROM wa_riwayat WHERE (nama IS NULL OR nama='') AND pesan IS NOT NULL")).fetchall()
+                for rid, pesan in sisa:
+                    m = re.search(r"Bapak/Ibu\s+(.+?)[.,:\n]", pesan or "")
+                    if m and m.group(1).strip().lower() != "pelanggan":
+                        conn.execute(text("UPDATE wa_riwayat SET nama=:n WHERE id=:i"), {"n": m.group(1).strip()[:150], "i": rid})
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                print(f"[DB MIGRATION] isi nama riwayat dilewati: {e}")
 
-def save_reading(id_pelanggan: str, stand_meter: float, stand_meter_raw: str,
-                 nama_file_foto: str, confidence_score: float = 1.0,
-                 status_validasi: str = "SUCCESS", catatan: str = "",
-                 link_drive: str = "", latitude: float = None,
-                 longitude: float = None, no_seri_meter: str = None,
-                 daya: int = None, periode_bulan: str = None,
-                 pemakaian_kwh: float = None, tagihan_rupiah: float = None,
-                 uploader_username: str = None) -> SwacamReading:
-    """Menyimpan hasil bacaan meter ke database."""
-    session = SessionLocal()
-    try:
-        record = SwacamReading(
-            id_pelanggan=id_pelanggan,
-            no_seri_meter=no_seri_meter,
-            stand_meter=stand_meter,
-            stand_meter_raw=stand_meter_raw,
-            nama_file_foto=nama_file_foto,
-            link_drive=link_drive,
-            confidence_score=confidence_score,
-            status_validasi=status_validasi,
-            catatan=catatan,
-            uploader_username=uploader_username,
-            latitude=latitude,
-            longitude=longitude,
-            daya=daya,
-            periode_bulan=periode_bulan,
-            pemakaian_kwh=pemakaian_kwh,
-            tagihan_rupiah=tagihan_rupiah
-        )
-
-        session.add(record)
-        session.commit()
-        session.refresh(record)
-        return record
-    except Exception as e:
-        session.rollback()
-        raise e
-    finally:
-        session.close()
-
-def check_duplicate_reading(id_pelanggan: str, stand_meter: float, periode_bulan: str = None) -> SwacamReading:
-    """Mengecek apakah IDPEL dan Stand Meter yang sama sudah pernah diinput sebelumnya di bulan yang sama."""
-    if not id_pelanggan or stand_meter is None:
-        return None
-    session = SessionLocal()
-    try:
-        query = session.query(SwacamReading).filter(
-            SwacamReading.id_pelanggan == id_pelanggan,
-            SwacamReading.stand_meter == stand_meter
-        )
-        if periode_bulan:
-            query = query.filter(SwacamReading.periode_bulan == periode_bulan)
-        return query.order_by(SwacamReading.id.desc()).first()
-    finally:
-        session.close()
-
-def get_reading_by_id(reading_id: int) -> SwacamReading:
-    """Mengambil satu data pencatatan berdasarkan ID."""
-    session = SessionLocal()
-    try:
-        return session.query(SwacamReading).filter(SwacamReading.id == reading_id).first()
-    finally:
-        session.close()
-
-def get_last_reading_by_idpel(id_pelanggan: str, exclude_id: int = None) -> SwacamReading:
-    """Mengambil data pencatatan terakhir untuk ID Pelanggan tertentu."""
-    if not id_pelanggan:
-        return None
-    session = SessionLocal()
-    try:
-        q = session.query(SwacamReading).filter(
-            SwacamReading.id_pelanggan == id_pelanggan
-        )
-        if exclude_id is not None:
-            q = q.filter(SwacamReading.id != exclude_id)
-        return q.order_by(SwacamReading.id.desc()).first()
-    finally:
-        session.close()
-
-def get_initial_daya_by_idpel(id_pelanggan: str, exclude_id: int = None):
-    """Daya (VA) AWAL pelanggan = daya pada pencatatan paling pertama yang punya data daya."""
-    if not id_pelanggan:
-        return None
-    session = SessionLocal()
-    try:
-        q = session.query(SwacamReading).filter(
-            SwacamReading.id_pelanggan == id_pelanggan,
-            SwacamReading.daya.isnot(None),
-        )
-        if exclude_id is not None:
-            q = q.filter(SwacamReading.id != exclude_id)
-        rec = q.order_by(SwacamReading.id.asc()).first()
-        return rec.daya if rec else None
-    finally:
-        session.close()
-
-def delete_reading(reading_id: int) -> bool:
-    """Menghapus data pencatatan berdasarkan ID."""
-    session = SessionLocal()
-    try:
-        record = session.query(SwacamReading).filter(SwacamReading.id == reading_id).first()
-        if record:
-            session.delete(record)
-            session.commit()
-            return True
-        return False
-    except Exception as e:
-        session.rollback()
-        raise e
-    finally:
-        session.close()
-
-def delete_all_readings() -> int:
-    """Menghapus SEMUA data pencatatan meter. Mengembalikan jumlah baris yang dihapus."""
-    session = SessionLocal()
-    try:
-        n = session.query(SwacamReading).delete(synchronize_session=False)
-        session.commit()
-        return n
-    except Exception as e:
-        session.rollback()
-        raise e
-    finally:
-        session.close()
-
-def update_reading(reading_id: int, id_pelanggan: str, stand_meter: float,
-                   stand_meter_raw: str, confidence_score: float,
-                   status_validasi: str, catatan: str,
-                   latitude: float = None, longitude: float = None,
-                   no_seri_meter: str = None) -> SwacamReading:
-    """Memperbarui data pencatatan hasil cek ulang AI."""
-    session = SessionLocal()
-    try:
-        record = session.query(SwacamReading).filter(SwacamReading.id == reading_id).first()
-        if record:
-            record.id_pelanggan = id_pelanggan
-            record.no_seri_meter = no_seri_meter
-            record.stand_meter = stand_meter
-            record.stand_meter_raw = stand_meter_raw
-            record.confidence_score = confidence_score
-            record.status_validasi = status_validasi
-            record.catatan = catatan
-            record.latitude = latitude
-            record.longitude = longitude
-            session.commit()
-            session.refresh(record)
-            return record
-        return None
-    except Exception as e:
-        session.rollback()
-        raise e
-    finally:
-        session.close()
-
-def get_all_readings():
-    """Mengambil semua riwayat pencatatan meteran dari database."""
-    session = SessionLocal()
-    try:
-        return session.query(SwacamReading).order_by(SwacamReading.id.desc()).all()
-    finally:
-        session.close()
 
 def log_activity(username: str, role: str, action: str, details: str = None, ip_address: str = None):
     """Mencatat aktivitas pengguna ke tabel audit_logs."""
-    session = SessionLocal()
+    session = AuthSessionLocal()
     try:
         log_entry = AuditLog(
             username=username,
@@ -393,7 +466,7 @@ def log_activity(username: str, role: str, action: str, details: str = None, ip_
 
 def get_all_audit_logs(limit: int = 100):
     """Mengambil log aktivitas terbaru."""
-    session = SessionLocal()
+    session = AuthSessionLocal()
     try:
         logs = session.query(AuditLog).order_by(AuditLog.id.desc()).limit(limit).all()
         return [l.to_dict() for l in logs]
@@ -402,7 +475,7 @@ def get_all_audit_logs(limit: int = 100):
 
 def get_user_by_username(username: str):
     """Mengambil akun pegawai dari database berdasarkan username."""
-    session = SessionLocal()
+    session = AuthSessionLocal()
     try:
         user = session.query(UserAccount).filter(UserAccount.username == username.lower()).first()
         if user:
@@ -423,7 +496,7 @@ def get_user_by_username(username: str):
 def update_user_phone(username: str, phone_number: str):
     """Update nomor WA milik SATU akun saja (dicari berdasarkan username miliknya sendiri),
     supaya perubahan akun A tidak pernah menimpa data akun B."""
-    session = SessionLocal()
+    session = AuthSessionLocal()
     try:
         user = session.query(UserAccount).filter(UserAccount.username == username.lower()).first()
         if not user:
@@ -439,7 +512,7 @@ def update_user_phone(username: str, phone_number: str):
 
 def update_user_photo(username: str, foto_profil: str):
     """Update foto profil milik SATU akun saja (dicari berdasarkan username miliknya sendiri)."""
-    session = SessionLocal()
+    session = AuthSessionLocal()
     try:
         user = session.query(UserAccount).filter(UserAccount.username == username.lower()).first()
         if not user:
@@ -456,7 +529,7 @@ def update_user_photo(username: str, foto_profil: str):
 def register_new_user(username: str, password: str, full_name: str, phone_number: str = None, role: str = "petugas"):
     """Daftar pegawai baru ke database (password di-hash sebelum disimpan)."""
     import hashlib
-    session = SessionLocal()
+    session = AuthSessionLocal()
     try:
         existing = session.query(UserAccount).filter(UserAccount.username == username.lower()).first()
         if existing:
@@ -487,7 +560,7 @@ def request_password_reset(username: str, full_name: str):
     """Menandai akun untuk diminta reset password oleh Admin.
     Identitas dicek sederhana (username + nama lengkap harus cocok) agar
     tidak sembarang orang bisa memicu permintaan reset akun orang lain."""
-    session = SessionLocal()
+    session = AuthSessionLocal()
     try:
         user = session.query(UserAccount).filter(UserAccount.username == username.lower().strip()).first()
         if not user:
@@ -506,7 +579,7 @@ def request_password_reset(username: str, full_name: str):
 def admin_reset_password(user_id: int, new_password: str):
     """Admin mengatur ulang password pengguna secara langsung."""
     import hashlib
-    session = SessionLocal()
+    session = AuthSessionLocal()
     try:
         user = session.query(UserAccount).filter(UserAccount.id == user_id).first()
         if not user:
@@ -516,6 +589,48 @@ def admin_reset_password(user_id: int, new_password: str):
         user.reset_requested = False
         session.commit()
         return True, user.username
+    except Exception as e:
+        session.rollback()
+        return False, str(e)
+    finally:
+        session.close()
+
+def get_all_users():
+    """Mengambil seluruh data akun pengguna (termasuk status approval & permintaan reset password)."""
+    session = AuthSessionLocal()
+    try:
+        users = session.query(UserAccount).order_by(UserAccount.id.desc()).all()
+        return [u.to_dict() for u in users]
+    finally:
+        session.close()
+
+def update_user_status(user_id: int, new_status: str):
+    """Admin menyetujui (approve) atau menolak (reject) akun pengguna."""
+    session = AuthSessionLocal()
+    try:
+        user = session.query(UserAccount).filter(UserAccount.id == user_id).first()
+        if not user:
+            return False, "Pengguna tidak ditemukan."
+        user.status = new_status
+        session.commit()
+        return True, user.username
+    except Exception as e:
+        session.rollback()
+        return False, str(e)
+    finally:
+        session.close()
+
+def delete_user(user_id: int):
+    """Admin menghapus akun pengguna."""
+    session = AuthSessionLocal()
+    try:
+        user = session.query(UserAccount).filter(UserAccount.id == user_id).first()
+        if not user:
+            return False, "Pengguna tidak ditemukan."
+        username = user.username
+        session.delete(user)
+        session.commit()
+        return True, username
     except Exception as e:
         session.rollback()
         return False, str(e)
