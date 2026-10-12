@@ -1,0 +1,9 @@
+# Ignore
+__pycache__/
+*.pyc
+.env
+*.sql
+update_templates.py
+generate_html.py
+temp_*.py
+check_routes.py

@@ -231,6 +231,11 @@ def _create_wa_tables():
                 ('PENGINGAT_1', 'Pengingat Pertama', 1, 1, NULL, 'Yth. Bapak/Ibu Pelanggan PLN, {nama} ID PEL. {idpel}\n\nSebagai bentuk pelayanan terbaik, kami mengingatkan bahwa periode pembayaran tagihan listrik berlangsung setiap tanggal 2 hingga tanggal 20 setiap bulan.\n\nKami menghimbau Bapak/Ibu untuk melakukan pembayaran sebelum tanggal 20 melalui kanal pembayaran resmi seperti PLN Mobile maupun gerai pembayaran lainnya.\n\nBapak Ibu Yth, kami informasikan bahwa hari ini telah memasuki tanggal 21 akan tetapi tagihan listrik belum diselesaikan, maka sesuai ketentuan yang berlaku akan dilakukan pemutusan sementara aliran listrik sampai dengan kewajiban pembayaran dipenuhi.\n\nKami mengharapkan Bapak/Ibu mempunyai back up kelistrikan cadangan seperti genset dan lain-lain.\n\nTerima kasih atas perhatian dan kerja sama Bapak/Ibu dalam menjaga kelancaran pelayanan kelistrikan.\n\nSalam hormat,\nPT PLN (Persero) UID S2JB.', 1),
                 ('PENGINGAT_RAMAH', 'Pengingat Ramah', 0, -5, -1, 'Yth. Bapak/Ibu Pelanggan PLN, {nama} dengan ID Pelanggan {idpel}.\n\nSebagai bentuk pelayanan terbaik, kami mengingatkan bahwa periode pembayaran tagihan listrik berlangsung setiap tanggal 2 hingga tanggal 20 setiap bulan.\n\nKami menghimbau Bapak/Ibu untuk melakukan pembayaran sebelum tanggal 20 melalui kanal pembayaran resmi seperti PLN Mobile maupun gerai pembayaran lainnya.\n\nApabila hingga melewati tanggal 20 tagihan listrik belum diselesaikan, maka sesuai ketentuan yang berlaku akan dilakukan pemutusan sementara aliran listrik sampai dengan kewajiban pembayaran dipenuhi.\n\nTerima kasih atas perhatian dan kerja sama Bapak/Ibu dalam menjaga kelancaran pelayanan kelistrikan.\n\nSalam hormat,\nPT PLN (Persero) UID S2JB.', 1)
             '''))
+        else:
+            try:
+                conn.execute(text("UPDATE wa_template SET isi=REPLACE(isi, 'tanggal 21', 'tanggal {tanggal_sekarang}') WHERE kode='PENGINGAT_1' AND isi LIKE '%tanggal 21%'"))
+            except Exception:
+                pass
         if 'wa_webhook_log' not in tabel:
             conn.execute(text('''
                 CREATE TABLE wa_webhook_log (
