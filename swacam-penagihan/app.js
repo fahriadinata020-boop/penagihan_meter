@@ -1130,18 +1130,44 @@ function anCharts(bln,cur){
   const sc=(pos,extra)=>Object.assign({position:pos,ticks:{color:tick},grid:{color:grid}},extra||{});
   const buat=(id,cfg)=>{ if(anChart[id]) anChart[id].destroy(); anChart[id]=new Chart(document.getElementById(id),cfg); };
   buat('an-c-trend',{data:{labels:lab,datasets:[
-    {type:'bar',order:2,label:'Nominal belum lunas (juta Rp)',data:bln.map(b=>+(b.nominal_belum_lunas/1e6).toFixed(2)),yAxisID:'y',borderRadius:6,
-      backgroundColor:sel.map(s=>s?'#d97706':'rgba(217,119,6,.35)')},
-    {type:'line',order:1,label:'% lunas',data:bln.map(b=>b.persen_lunas),yAxisID:'y1',borderColor:'#10b981',backgroundColor:'#10b981',tension:.3,pointRadius:sel.map(s=>s?7:4),pointHoverRadius:8}]},
+    {type:'line',order:2,label:'Nominal belum lunas (juta Rp)',data:bln.map(b=>+(b.nominal_belum_lunas/1e6).toFixed(2)),yAxisID:'y',
+      borderColor:'#d97706',backgroundColor:'rgba(217,119,6,.15)',borderWidth:3,fill:true,tension:.35,
+      pointRadius:sel.map(s=>s?7:5),pointHoverRadius:9,pointBackgroundColor:'#d97706',pointBorderColor:'#fff',pointBorderWidth:2},
+    {type:'line',order:1,label:'% lunas',data:bln.map(b=>b.persen_lunas),yAxisID:'y1',
+      borderColor:'#10b981',backgroundColor:'rgba(16,185,129,.1)',borderWidth:2.5,tension:.3,
+      pointRadius:sel.map(s=>s?7:4),pointHoverRadius:8,pointBackgroundColor:'#10b981'}]},
     options:Object.assign({},base,{scales:{x:{ticks:{color:tick},grid:{display:false}},y:sc('left',{beginAtZero:true,title:{display:true,text:'Juta Rp',color:tick}}),
       y1:sc('right',{min:0,max:100,grid:{drawOnChartArea:false},ticks:{color:tick,callback:v=>v+'%'}})}})});
   buat('an-c-wa',{data:{labels:lab,datasets:[
-    {type:'bar',order:3,label:'Pesan terkirim',data:bln.map(b=>b.wa_terkirim),yAxisID:'y',borderRadius:6,backgroundColor:sel.map(s=>s?'#1a6fd4':'rgba(26,111,212,.35)')},
-    {type:'line',order:1,label:'% dibaca',data:bln.map(b=>b.persen_baca),yAxisID:'y1',borderColor:'#059669',backgroundColor:'#059669',tension:.3,spanGaps:true,pointRadius:4},
-    {type:'line',order:1,label:'% dibalas',data:bln.map(b=>b.persen_balasan),yAxisID:'y1',borderColor:'#7c3aed',backgroundColor:'#7c3aed',tension:.3,spanGaps:true,pointRadius:4}]},
+    {type:'line',order:3,label:'Pesan terkirim',data:bln.map(b=>b.wa_terkirim),yAxisID:'y',
+      borderColor:'#1a6fd4',backgroundColor:'rgba(26,111,212,.15)',borderWidth:3,fill:true,tension:.35,
+      pointRadius:sel.map(s=>s?7:5),pointHoverRadius:9,pointBackgroundColor:'#1a6fd4',pointBorderColor:'#fff',pointBorderWidth:2},
+    {type:'line',order:1,label:'% dibaca',data:bln.map(b=>b.persen_baca),yAxisID:'y1',borderColor:'#059669',backgroundColor:'#059669',borderWidth:2,tension:.3,spanGaps:true,pointRadius:4},
+    {type:'line',order:1,label:'% dibalas',data:bln.map(b=>b.persen_balasan),yAxisID:'y1',borderColor:'#7c3aed',backgroundColor:'#7c3aed',borderWidth:2,tension:.3,spanGaps:true,pointRadius:4}]},
     options:Object.assign({},base,{scales:{x:{ticks:{color:tick},grid:{display:false}},y:sc('left',{beginAtZero:true,title:{display:true,text:'Pesan',color:tick}}),
       y1:sc('right',{min:0,max:100,grid:{drawOnChartArea:false},ticks:{color:tick,callback:v=>v+'%'}})}})});
 }
+
+
+// === Navigasi Interaktif Dashboard -> Impor Tunggakan ===
+function bukaTunggakanDariDash(kat){
+  showPage('page-tunggakan');
+  tgKat = kat || '';
+  tgPage = 1;
+  tgRender();
+  const el = document.getElementById('tg-table-card');
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+window.bukaTunggakanDariDash = bukaTunggakanDariDash;
+
+function bukaDetailDariDash(id){
+  showPage('page-tunggakan');
+  setTimeout(()=>{
+    const x = tgData.find(v=>v.id===id);
+    if(x) tgDetail(id);
+  }, 200);
+}
+window.bukaDetailDariDash = bukaDetailDariDash;
 
 
 // === Dashboard Penagihan (animasi) ===
@@ -1172,20 +1198,60 @@ async function loadDash(){
   const col=getComputedStyle(document.body).getPropertyValue('color')||'#334155';
   if(dbDonut) dbDonut.destroy();
   dbDonut=new Chart(document.getElementById('db-donut'),{type:'doughnut',data:{labels:['Menunggak','Belum jatuh tempo','Lunas'],datasets:[{data:[tung.length,cnt('BELUM_JATUH_TEMPO'),cnt('LUNAS')],backgroundColor:['#e11d48','#f59e0b','#10b981'],borderWidth:0,hoverOffset:10}]},options:{maintainAspectRatio:false,cutout:'68%',animation:{animateRotate:true,duration:1400,easing:'easeOutQuart'},plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,font:{size:11}}}}}});
-  // bar per periode
+  // grafik garis per periode (sebelumnya grafik batang)
   const per={}; tg.forEach(x=>{ if(x.kategori==='LUNAS') return; const k=x.periode||'Tanpa periode'; per[k]=(per[k]||0)+(x.nominal||0); });
   const ks=Object.keys(per).sort((a,b)=>tgPerUrut(a)-tgPerUrut(b));
   if(dbBar) dbBar.destroy();
-  dbBar=new Chart(document.getElementById('db-bar'),{type:'bar',data:{labels:ks,datasets:[{label:'Nominal',data:ks.map(k=>per[k]),borderRadius:10,backgroundColor:'#1a6fd4',hoverBackgroundColor:'#fbbf24'}]},options:{maintainAspectRatio:false,animation:{duration:1300,easing:'easeOutBack',delay:c=>c.dataIndex*120},plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>dbRp(v)},grid:{color:'rgba(148,163,184,.2)'}}}}});
+  dbBar=new Chart(document.getElementById('db-bar'),{
+    type:'line',
+    data:{
+      labels:ks,
+      datasets:[{
+        label:'Nominal Menunggak',
+        data:ks.map(k=>per[k]),
+        borderColor:'#1a6fd4',
+        backgroundColor:'rgba(26,111,212,0.12)',
+        borderWidth:3,
+        fill:true,
+        tension:0.35,
+        pointRadius:6,
+        pointHoverRadius:8,
+        pointBackgroundColor:'#1a6fd4',
+        pointBorderColor:'#fff',
+        pointBorderWidth:2
+      }]
+    },
+    options:{
+      maintainAspectRatio:false,
+      animation:{duration:1200,easing:'easeOutQuart'},
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false}},
+        y:{ticks:{callback:v=>dbRp(v)},grid:{color:'rgba(148,163,184,.2)'}}
+      }
+    }
+  });
   // ring WA
   const len=314, ring=document.getElementById('db-ring-v');
   ring.style.setProperty('--off',len-len*pct/100); ring.style.animation='none'; void ring.getBoundingClientRect(); ring.style.animation='';
   dbCount(document.getElementById('db-ring-t'),pct,v=>Math.round(v)+'%');
   const st=k=>rw.filter(x=>x.status===k).length;
   document.getElementById('db-wa-det').innerHTML=`<div><b class="text-slate-700">${dikirim}</b> dari ${tung.length} menunggak sudah dikirimi</div><div><span class="text-sky-600 font-bold">${st('TERKIRIM')}</span> terkirim · <span class="text-emerald-600 font-bold">${st('DIBACA')}</span> dibaca</div><div><span class="text-violet-600 font-bold">${rw.filter(x=>x.balasan).length}</span> dibalas · <span class="text-rose-600 font-bold">${st('GAGAL')}</span> gagal</div>`;
-  // top menunggak
+  // top menunggak (bisa diklik)
   const top=[...tung].sort((a,b)=>(b.hari_terlambat||0)-(a.hari_terlambat||0)).slice(0,6);
-  document.getElementById('db-top').innerHTML=top.length?top.map((x,i)=>`<div class="db-row" style="--i:${i}">${tgAv(x.nama,false)}<div class="flex-1 min-w-0"><div class="font-semibold truncate">${tgNm(x)}</div><div class="text-[10px] text-slate-400">${tgEsc(x.id_pelanggan)} · ${tgEsc(x.periode||'-')}</div></div><div class="text-right"><div class="font-bold text-rose-600">${tgRp(x.nominal)}</div><div class="text-[10px] text-slate-400">${x.hari_terlambat||0} hari terlambat</div></div></div>`).join(''):'<p class="text-xs text-slate-400 py-6 text-center">Tidak ada tagihan menunggak. 🎉</p>';
+  document.getElementById('db-top').innerHTML=top.length?top.map((x,i)=>`
+    <div class="db-row cursor-pointer hover:bg-slate-50 transition p-2.5 rounded-xl border border-transparent hover:border-slate-100 flex items-center gap-3" style="--i:${i}" onclick="bukaDetailDariDash(${x.id})" title="Klik untuk lihat detail & kirim WA">
+      ${tgAv(x.nama,false)}
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold truncate text-slate-800">${tgNm(x)}</div>
+        <div class="text-[10px] text-slate-400 font-mono">${tgEsc(x.id_pelanggan)} · ${tgEsc(x.periode||'-')}</div>
+      </div>
+      <div class="text-right">
+        <div class="font-bold text-rose-600">${tgRp(x.nominal)}</div>
+        <div class="text-[10px] text-slate-400">${x.hari_terlambat||0} hari terlambat</div>
+      </div>
+      <div class="text-slate-300 pl-1"><i class="fa fa-chevron-right text-xs"></i></div>
+    </div>`).join(''):'<p class="text-xs text-slate-400 py-6 text-center">Tidak ada tagihan menunggak. 🎉</p>';
 }
 
 

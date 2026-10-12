@@ -15,7 +15,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<link rel="stylesheet" href="/static/style.css?v=1791769331">
+<link rel="stylesheet" href="/static/style.css?v=1791771943">
 </head>
 <body>
 
@@ -339,15 +339,15 @@
         </div>
       </div>
       <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
-      <div class="db-kpi" style="--i:0;--c:#1a6fd4;--bg:#eff6ff"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-file-invoice"></i></div></div><div class="n" id="k-total"><div class="db-skel"></div></div><div class="l">Total Tagihan</div></div>
-      <div class="db-kpi" style="--i:1;--c:#e11d48;--bg:#fff1f2"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-triangle-exclamation"></i></div></div><div class="n" id="k-tunggak"><div class="db-skel"></div></div><div class="l">Menunggak</div></div>
-      <div class="db-kpi" style="--i:2;--c:#d97706;--bg:#fffbeb"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-hourglass-half"></i></div></div><div class="n" id="k-belum"><div class="db-skel"></div></div><div class="l">Belum Jatuh Tempo</div></div>
-      <div class="db-kpi" style="--i:3;--c:#059669;--bg:#ecfdf5"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-circle-check"></i></div></div><div class="n" id="k-lunas"><div class="db-skel"></div></div><div class="l">Lunas</div></div>
-      <div class="db-kpi" style="--i:4;--c:#7c3aed;--bg:#f5f3ff"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-sack-dollar"></i></div></div><div class="n" id="k-nominal"><div class="db-skel"></div></div><div class="l">Nominal Menunggak</div></div>
+      <div class="db-kpi cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition" onclick="bukaTunggakanDariDash('')" title="Klik untuk lihat semua data tagihan" style="--i:0;--c:#1a6fd4;--bg:#eff6ff"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-file-invoice"></i></div><span class="text-[10px] font-bold text-blue-500 opacity-60"><i class="fa fa-arrow-right"></i></span></div><div class="n" id="k-total"><div class="db-skel"></div></div><div class="l">Total Tagihan</div></div>
+      <div class="db-kpi cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition" onclick="bukaTunggakanDariDash('MENUNGGAK')" title="Klik untuk saring tagihan menunggak" style="--i:1;--c:#e11d48;--bg:#fff1f2"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-triangle-exclamation"></i></div><span class="text-[10px] font-bold text-rose-500 opacity-60"><i class="fa fa-arrow-right"></i></span></div><div class="n" id="k-tunggak"><div class="db-skel"></div></div><div class="l">Menunggak</div></div>
+      <div class="db-kpi cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition" onclick="bukaTunggakanDariDash('BELUM_JATUH_TEMPO')" title="Klik untuk saring tagihan belum jatuh tempo" style="--i:2;--c:#d97706;--bg:#fffbeb"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-hourglass-half"></i></div><span class="text-[10px] font-bold text-amber-500 opacity-60"><i class="fa fa-arrow-right"></i></span></div><div class="n" id="k-belum"><div class="db-skel"></div></div><div class="l">Belum Jatuh Tempo</div></div>
+      <div class="db-kpi cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition" onclick="bukaTunggakanDariDash('LUNAS')" title="Klik untuk saring tagihan yang sudah lunas" style="--i:3;--c:#059669;--bg:#ecfdf5"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-circle-check"></i></div><span class="text-[10px] font-bold text-emerald-500 opacity-60"><i class="fa fa-arrow-right"></i></span></div><div class="n" id="k-lunas"><div class="db-skel"></div></div><div class="l">Lunas</div></div>
+      <div class="db-kpi cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition" onclick="bukaTunggakanDariDash('MENUNGGAK')" title="Klik untuk lihat daftar tunggakan" style="--i:4;--c:#7c3aed;--bg:#f5f3ff"><div class="flex items-center justify-between"><div class="ic"><i class="fa fa-sack-dollar"></i></div><span class="text-[10px] font-bold text-violet-500 opacity-60"><i class="fa fa-arrow-right"></i></span></div><div class="n" id="k-nominal"><div class="db-skel"></div></div><div class="l">Nominal Menunggak</div></div>
       </div>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div class="db-card" style="--i:5"><h3><i class="fa fa-chart-pie text-sky-500 mr-2"></i>Status Tagihan</h3><div style="height:230px"><canvas id="db-donut"></canvas></div></div>
-        <div class="db-card lg:col-span-2" style="--i:6"><h3><i class="fa fa-chart-column text-violet-500 mr-2"></i>Nominal per Periode (Rp)</h3><div style="height:230px"><canvas id="db-bar"></canvas></div></div>
+        <div class="db-card lg:col-span-2" style="--i:6"><h3><i class="fa fa-chart-line text-blue-500 mr-2"></i>Nominal per Periode (Rp)</h3><div style="height:230px"><canvas id="db-bar"></canvas></div></div>
       </div>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div class="db-card" style="--i:7"><h3><i class="fa fa-paper-plane text-emerald-500 mr-2"></i>Jangkauan WhatsApp</h3>
@@ -512,12 +512,12 @@
         <div class="grid lg:grid-cols-2 gap-6">
           <div id="an-sec-trend" class="tg-card">
             <p class="tg-card-t mb-1"><i class="fa fa-arrow-trend-up text-amber-500"></i>Tren tunggakan &amp; pelunasan</p>
-            <p class="text-[11px] text-slate-400 mb-3">Batang: nominal belum lunas (juta Rp). Garis: % pelanggan lunas. Klik titik untuk memilih bulan.</p>
+            <p class="text-[11px] text-slate-400 mb-3">Garis oranye: nominal belum lunas (juta Rp). Garis hijau: % pelanggan lunas. Klik titik untuk memilih bulan.</p>
             <div style="height:260px"><canvas id="an-c-trend"></canvas></div>
           </div>
           <div id="an-sec-wa" class="tg-card">
             <p class="tg-card-t mb-1"><i class="fa-brands fa-whatsapp text-emerald-500"></i>Jangkauan pesan WhatsApp</p>
-            <p class="text-[11px] text-slate-400 mb-3">Batang: pesan terkirim. Garis: % dibalas.</p>
+            <p class="text-[11px] text-slate-400 mb-3">Garis biru: pesan terkirim. Garis hijau: % dibaca. Garis ungu: % dibalas.</p>
             <div style="height:260px"><canvas id="an-c-wa"></canvas></div>
             <p id="an-wa-note" class="hidden text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3"><i class="fa fa-triangle-exclamation mr-1"></i>Persentase dibalas belum terisi karena webhook Fonnte belum aktif. Pasang webhook (lihat README) agar status Diterima dan Balasan tercatat.</p>
           </div>
@@ -666,6 +666,6 @@
 <div id="toast-container" class="fixed bottom-6 right-6 z-[300] flex flex-col gap-3 pointer-events-none"></div>
 
 <script>window.SWACAM={app:"penagihan",otherUrl:""};</script>
-<script src="/static/app.js?v=1791769331"></script>
+<script src="/static/app.js?v=1791771943"></script>
 </body>
 </html>
