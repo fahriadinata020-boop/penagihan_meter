@@ -421,8 +421,13 @@ def render_pesan(template: Optional[str], row: dict, batas: int = None) -> str:
     today_dt = datetime.date.today()
 
     # Otomatis sesuaikan angka tanggal agar selalu mengikuti tanggal hari ini saat pesan dikirim
+    # Kebal terhadap format apa pun: tanggal 21, {tanggal_sekarang}, {hari_ini}, maupun spasi kosong
     if template:
-        template = re.sub(r"telah memasuki tanggal \d+", f"telah memasuki tanggal {today_dt.day}", template)
+        template = re.sub(
+            r"telah memasuki tanggal(?:\s+\d+|\s+\{[^}]*\}|\s*)[,\s]*akan tetapi",
+            f"telah memasuki tanggal {today_dt.day} akan tetapi",
+            template
+        )
 
     template = (template or "").strip() or get_pesan_default(today_dt)
 
