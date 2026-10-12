@@ -420,14 +420,9 @@ def _salam(now: datetime.datetime = None) -> str:
 def render_pesan(template: Optional[str], row: dict, batas: int = None) -> str:
     today_dt = datetime.date.today()
 
-    # Jika hari ini masih tanggal <= 20, jangan sampai memakai template 'telah memasuki tanggal 21'
-    if today_dt.day <= 20:
-        if template and "telah memasuki tanggal" in template:
-            template = get_pesan_default(today_dt)
-    else:
-        # Jika hari ini tanggal 21 ke atas, pastikan angka tanggal mengikuti hari ini
-        if template:
-            template = re.sub(r"telah memasuki tanggal \d+", f"telah memasuki tanggal {today_dt.day}", template)
+    # Otomatis sesuaikan angka tanggal agar selalu mengikuti tanggal hari ini saat pesan dikirim
+    if template:
+        template = re.sub(r"telah memasuki tanggal \d+", f"telah memasuki tanggal {today_dt.day}", template)
 
     template = (template or "").strip() or get_pesan_default(today_dt)
 
