@@ -82,19 +82,32 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".jfif", ".jif", ".png", ".webp", ".bmp",
 
 # Static Files Directory Setup
 STATIC_DIR = BASE_DIR / "static"
+
+@app.get("/")
+def read_root():
+    """Halaman web aplikasi Penagihan dengan anti-cache header."""
+    p = STATIC_DIR / "index.html"
+    if not p.exists() or ((BASE_DIR / "index.html").exists() and (BASE_DIR / "index.html").stat().st_mtime > p.stat().st_mtime):
+        p = BASE_DIR / "index.html"
+    if p.exists():
+        return FileResponse(p, headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"})
+    return {"message": "Web Penagihan & WhatsApp PLN SWACAM Active"}
+
+@app.get("/static/app.js")
+def read_app_js():
+    """Menyajikan app.js terbaru (baik di root maupun folder static) tanpa cache browser."""
+    p = STATIC_DIR / "app.js"
+    if not p.exists() or ((BASE_DIR / "app.js").exists() and (BASE_DIR / "app.js").stat().st_mtime > p.stat().st_mtime):
+        p = BASE_DIR / "app.js"
+    if p.exists():
+        return FileResponse(p, media_type="application/javascript", headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"})
+    raise HTTPException(404, "app.js not found")
+
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # Foto profil dipakai bersama aplikasi Catat Meter (folder avatars yang sama, lihat AVATAR_DIR di .env)
 app.mount("/avatars", StaticFiles(directory=str(AVATAR_DIR)), name="avatars")
-
-@app.get("/")
-def read_root():
-    """Halaman web aplikasi Penagihan (PHP: static/index.php)."""
-    index_path = STATIC_DIR / "index.html"
-    if index_path.exists():
-        return FileResponse(index_path)
-    return {"message": "Web Penagihan & WhatsApp PLN SWACAM Active"}
 
 @app.get("/health")
 def health_check():
