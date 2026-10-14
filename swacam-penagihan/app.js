@@ -449,7 +449,7 @@ async function loadTunggakan(){
 }
 
 // ── Template bertahap (#4, #5) ──
-const tgKode=()=>tgTpl.siap?document.getElementById('tg-tpl-pilih').value:null;   // null = perilaku lama
+const tgKode=()=>{ const el=document.getElementById('tg-tpl-pilih'); return (el&&el.value)?el.value:'AUTO'; };
 const tgTemplate=()=>tgKode()==='AUTO'?'':document.getElementById('tg-template').value;
 const tgNamaTpl=k=>((tgTpl.list.find(t=>t.kode===k)||{}).nama)||k;
 async function tgInitTemplate(){
@@ -460,8 +460,9 @@ async function tgInitTemplate(){
     if(!d.siap||!d.templates.length) return;
     tgTpl={siap:true,list:d.templates.filter(t=>t.aktif),jendela:d.jendela};
     const sel=document.getElementById('tg-tpl-pilih');
-    sel.innerHTML='<option value="AUTO">Otomatis (sesuai hari terlambat &amp; riwayat)</option>'+
+    sel.innerHTML='<option value="AUTO" selected>Otomatis (sesuai hari terlambat &amp; riwayat)</option>'+
       tgTpl.list.map(t=>`<option value="${tgEsc(t.kode)}">${tgEsc(t.nama)}</option>`).join('');
+    sel.value='AUTO';
     sel.classList.remove('hidden');
     tgGantiTemplate();
   }catch(_){}
@@ -472,12 +473,11 @@ function tgGantiTemplate(){
   box.classList.toggle('hidden',!auto); ta.classList.toggle('hidden',auto);
   document.getElementById('tg-tpl-simpan').classList.toggle('hidden',auto);
   if(auto){
-    const j=tgTpl.jendela||{mulai:2,selesai:20};
+    const j=tgTpl.jendela||{mulai:15,selesai:17};
     box.innerHTML='<b>Sistem memilih template untuk tiap pelanggan:</b><ul class="list-disc ml-5 mt-2 space-y-1">'+
-      tgTpl.list.map(t=>t.tahap===0
-        ?`<li><b>${tgEsc(t.nama)}</b>: pelanggan dalam masa periode pembayaran (tanggal ${j.mulai}-${j.selesai}).</li>`
-        :`<li><b>${tgEsc(t.nama)}</b>: terlambat ${t.hari_min}${t.hari_max==null?' hari atau lebih':'-'+t.hari_max+' hari'}.</li>`).join('')+
-      '</ul><p class="mt-2 text-slate-500">Pesan otomatis menyesuaikan tanggal pengiriman saat ini.</p>';
+      `<li><b>Pengingat Ramah</b>: pelanggan yang belum jatuh tempo, hanya pada tanggal ${j.mulai}–${j.selesai}.</li>`+
+      '<li><b>Pengingat Pertama</b>: terlambat 1 hari atau lebih.</li>'+
+      '</ul><p class="mt-2 text-slate-600">Tahap tidak melompat: pelanggan yang belum pernah diingatkan selalu mulai dari pengingat pertama, lalu naik sesuai riwayat kirim dan hari terlambat.</p>';
   }else{
     const t=tgTpl.list.find(v=>v.kode===kode);
     if(t) ta.value=t.isi;

@@ -14,7 +14,7 @@ import io
 import os
 import re
 import datetime
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 import requests
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -40,7 +40,7 @@ def get_pesan_default(today: Optional[datetime.date] = None) -> str:
     today = today or datetime.date.today()
     if today.day <= 20:
         return (
-            "Yth. Bapak/Ibu Pelanggan PLN, {nama} dengan ID Pelanggan {idpel}.\n\n"
+            "Yth. Bapak/Ibu Pelanggan PLN, {nama} dengan ID Pelanggan {idpel} sebesar {tagihan}.\n\n"
             "Sebagai bentuk pelayanan terbaik, kami mengingatkan bahwa periode pembayaran "
             "tagihan listrik berlangsung setiap tanggal 2 hingga tanggal 20 setiap bulan.\n\n"
             "Kami menghimbau Bapak/Ibu untuk melakukan pembayaran sebelum tanggal 20 melalui "
@@ -54,7 +54,7 @@ def get_pesan_default(today: Optional[datetime.date] = None) -> str:
         )
     else:
         return (
-            "Yth. Bapak/Ibu Pelanggan PLN, {nama} ID PEL. {idpel}\n\n"
+            "Yth. Bapak/Ibu Pelanggan PLN, {nama} ID PEL. {idpel} sebesar {tagihan}.\n\n"
             "Sebagai bentuk pelayanan terbaik, kami mengingatkan bahwa periode pembayaran "
             "tagihan listrik berlangsung setiap tanggal 2 hingga tanggal 20 setiap bulan.\n\n"
             "Kami menghimbau Bapak/Ibu untuk melakukan pembayaran sebelum tanggal 20 melalui "
@@ -70,9 +70,10 @@ def get_pesan_default(today: Optional[datetime.date] = None) -> str:
 
 PESAN_DEFAULT = get_pesan_default()
 
-PLACEHOLDERS = ["nama", "idpel", "periode", "tagihan", "jatuh_tempo",
+PLACEHOLDERS = ["nama", "idpel", "periode", "tagihan", "tunggakan", "jatuh_tempo",
                 "hari_terlambat", "alamat", "batas_tanggal", "tanggal_sekarang",
-                "hari_ini", "salam", "kontak"]
+                "hari_ini", "salam", "kontak", "pemda", "unitup", "tarip", "daya",
+                "pic_nama", "manager_nama"]
 
 
 # ─────────────────────────────────────────────────────────────
@@ -200,30 +201,65 @@ def rupiah(n) -> str:
 # ─────────────────────────────────────────────────────────────
 # Urutan penting: field yang lebih spesifik diperiksa lebih dulu.
 FIELD_KEYS = [
-    ("tgl_bayar", ["tanggalbayar", "tglbayar", "tanggalpembayaran", "tglpembayaran", "tglbyr",
-                   "tanggallunas", "tgllunas", "paiddate"]),
+    ("tgl_bayar", ["tglbayarblnnow", "tglbayarnow", "tanggalbayarnow", "tanggalbayar", "tglbayar",
+                   "tanggalpembayaran", "tglpembayaran", "tglbyr", "tanggallunas", "tgllunas", "paiddate"]),
     ("jatuh_tempo", ["jatuhtempo", "tgljatuhtempo", "duedate", "batasbayar", "batasakhir"]),
-    ("status", ["statusbayar", "statuspembayaran", "statuspelunasan", "statustunggakan",
+    ("status", ["statusnow", "statusbayar", "statuspembayaran", "statuspelunasan", "statustunggakan",
                 "statustagihan", "status", "keteranganbayar", "pembayaran"]),
     ("tunggakan", ["tunggakan", "tunggak", "sisatagihan", "kekurangan", "outstanding"]),
-    ("periode", ["periode", "bulan", "blth"]),
-    ("tagihan", ["tagihan", "nominal", "rptag", "totalbayar", "jumlah", "total", "amount", "biaya"]),
-    ("no_hp", ["nohp", "nomorhp", "nowa", "nomorwa", "whatsapp", "telepon", "telp", "phone",
-               "handphone", "kontak", "hp", "wa"]),
-    ("idpel", ["idpel", "idpelanggan", "nopelanggan", "nomorpelanggan", "nopel", "idpelanggan"]),
+    ("periode", ["periode", "blth"]),
+    ("tagihan", ["rptagnow", "rptag", "tagihan", "nominal", "totalbayar", "jumlah", "total", "amount", "biaya"]),
+    ("no_hp", ["nowapicpembayaran", "nowapic", "nowa", "nohp", "nomorhp", "nomorwa",
+               "whatsapp", "telepon", "telp", "phone", "handphone", "kontak", "hp", "wa"]),
+    ("no_hp_manager", ["nowamanager", "nomorwamanager", "nohpmanager", "wamanager"]),
+    ("pic_nama", ["namapicpembayaran", "namapic"]),
+    ("manager_nama", ["namamanager"]),
+    ("pemda", ["pemda"]),
+    ("unitup", ["unitup"]),
+    ("nama_unitup", ["namaunitup"]),
+    ("tarip", ["tarip", "tarif"]),
+    ("daya", ["daya"]),
+    ("idpel", ["idpel", "idpelanggan", "nopelanggan", "nomorpelanggan", "nopel"]),
     ("nama", ["nama", "pelanggan"]),
     ("alamat", ["alamat"]),
 ]
-LABEL_FIELD = {"idpel": "ID Pelanggan", "nama": "Nama", "no_hp": "No. WA/HP", "alamat": "Alamat",
-               "periode": "Periode", "tagihan": "Tagihan", "tunggakan": "Tunggakan",
-               "status": "Status bayar", "tgl_bayar": "Tanggal bayar", "jatuh_tempo": "Jatuh tempo"}
-KECUALI = {"nama": ("foto", "file", "seri"), "tagihan": ("kwh",), "status": ("validasi",)}
+LABEL_FIELD = {
+    "idpel": "ID Pelanggan", "nama": "Nama", "no_hp": "No. WA PIC", "no_hp_manager": "No. WA Manager",
+    "pic_nama": "Nama PIC", "manager_nama": "Nama Manager", "pemda": "PEMDA", "unitup": "UNITUP",
+    "nama_unitup": "Nama Unit", "tarip": "Tarif", "daya": "Daya",
+    "alamat": "Alamat", "periode": "Periode", "tagihan": "Rptag NOW", "tunggakan": "Tunggakan",
+    "status": "Status Now", "tgl_bayar": "Tgl Bayar Bln Now", "jatuh_tempo": "Jatuh tempo"
+}
+KECUALI = {
+    "nama": ("unitup", "unit", "pic", "manager", "kantor", "petugas", "admin", "foto", "file", "seri"),
+    "tagihan": ("kwh", "daya", "tarif", "helper"),
+    "status": ("validasi",),
+    "no_hp": ("manager",),
+}
 KATA_BELUM = ("belum", "tunggak", "unpaid", "nunggak", "tertunda", "outstanding", "kurang")
 KATA_LUNAS = ("lunas", "sudah", "paid", "terbayar", "selesai")
 
 
 def _cocok(norm_header: str, kw: str) -> bool:
+    if kw == "nama":
+        return norm_header in ("nama", "namapelanggan", "namaconsumer", "namanasabah", "customername")
     return norm_header == kw if len(kw) <= 3 else kw in norm_header
+
+
+def _periode_dari_headers(heads_raw, today: datetime.date = None) -> Optional[Tuple[Optional[int], int]]:
+    """Cari bulan (mis. 'NOW' -> bulan berjalan, 'NOV', 'NOVEMBER') pada baris header (Rptag NOW, Tgl Bayar Bln Now)."""
+    today = today or datetime.date.today()
+    for h in heads_raw:
+        s = str(h or "").lower()
+        if any(k in s for k in ("rptag", "status", "tgl bayar", "periode", "tagihan")):
+            if re.search(r"\bnow\b", s) or "now" in s:
+                return today.year, today.month
+            for bln, bl_num in sorted(_BULAN_MAP.items(), key=lambda x: len(x[0]), reverse=True):
+                if re.search(r"\b" + re.escape(bln) + r"\b", s) or bln in s:
+                    m_th = re.search(r"\b(20\d{2})\b", s)
+                    th = int(m_th.group(1)) if m_th else None
+                    return th, bl_num
+    return None
 
 
 def _petakan_header(row) -> dict:
@@ -306,6 +342,8 @@ def analisis_file(filename: str, content: bytes, batas: int, today: datetime.dat
         if any(k in mapping for k in ("status", "tunggakan", "tgl_bayar")):
             ada_kolom_status = True
 
+        p_headers = _periode_dari_headers(head, today)
+
         def ambil(row, field):
             i = mapping.get(field)
             return row[i] if i is not None and i < len(row) else None
@@ -328,30 +366,59 @@ def analisis_file(filename: str, content: bytes, batas: int, today: datetime.dat
                     belum_lunas = False
                 else:
                     status_tak_dikenal += 1
-            if belum_lunas is None and "tunggakan" in mapping:
-                belum_lunas = bool(tunggakan and tunggakan > 0)
             if belum_lunas is None and "tgl_bayar" in mapping:
                 belum_lunas = tgl_bayar is None
+            if belum_lunas is None and "tunggakan" in mapping:
+                belum_lunas = bool(tunggakan and tunggakan > 0)
             if belum_lunas is None:
                 belum_lunas = True
+
             periode_raw = ambil(row, "periode")
             if _parse_periode(periode_raw) is None and not _cell_text(periode_raw):
-                # file tidak punya isi Periode: pakai bulan dari nama file, kalau tidak ada pakai bulan ini
-                th, bl = p_file if p_file else (None, today.month)
-                periode_raw = f"{th or today.year}-{bl:02d}"
-                periode_otomatis = True
+                # file tidak punya kolom Periode terpisah: coba cari bulan dari header kolom (mis. Rptag NOV)
+                th, bl = p_file if p_file else (None, None)
+                if not bl and p_headers:
+                    th, bl = p_headers
+                th = th or today.year
+                bl = bl or today.month
+                periode_raw = f"{th}-{bl:02d}"
+                if not p_file and not p_headers:
+                    periode_otomatis = True
+
+            # Alamat: bila kolom alamat kosong, gunakan data PEMDA / Unit bila ada
+            alamat_val = _cell_text(ambil(row, "alamat"))
+            if not alamat_val:
+                pemda_val = _cell_text(ambil(row, "pemda"))
+                unit_val = _cell_text(ambil(row, "nama_unitup")) or _cell_text(ambil(row, "unitup"))
+                if pemda_val and unit_val:
+                    alamat_val = f"{pemda_val} ({unit_val})"
+                elif pemda_val:
+                    alamat_val = pemda_val
+                elif unit_val:
+                    alamat_val = unit_val
+
+            # No WA: utamakan No WA PIC Pembayaran, bila kosong pakai No WA Manager
+            hp_raw = ambil(row, "no_hp") or ambil(row, "no_hp_manager")
+            hp_norm = normalize_wa(hp_raw)
+
+            # Nominal tagihan / tunggakan
+            nominal = _to_number(ambil(row, "tagihan")) or tunggakan
+
             if not belum_lunas:
                 hasil["lunas"] += 1
-                hp_l = ambil(row, "no_hp")
                 hasil["lunas_list"].append({
                     "id_pelanggan": idpel,
                     "nama": _cell_text(ambil(row, "nama")) or None,
-                    "no_hp": normalize_wa(hp_l),
-                    "alamat": _cell_text(ambil(row, "alamat")) or None,
+                    "no_hp": hp_norm,
+                    "alamat": alamat_val or None,
                     "periode": _label_periode(periode_raw) or None,
-                    "nominal": _to_number(ambil(row, "tagihan")) or tunggakan,
+                    "nominal": nominal,
                     "jatuh_tempo": _to_date(ambil(row, "jatuh_tempo")),
                     "kategori": "LUNAS",
+                    "pemda": _cell_text(ambil(row, "pemda")) or None,
+                    "unitup": _cell_text(ambil(row, "nama_unitup")) or _cell_text(ambil(row, "unitup")) or None,
+                    "tarip": _cell_text(ambil(row, "tarip")) or None,
+                    "daya": _cell_text(ambil(row, "daya")) or None,
                 })
                 continue
 
@@ -364,17 +431,19 @@ def analisis_file(filename: str, content: bytes, batas: int, today: datetime.dat
                 except ValueError:
                     due = datetime.date(p[0], p[1], 28)
 
-            nominal = tunggakan if (tunggakan and tunggakan > 0) else _to_number(ambil(row, "tagihan"))
-            hp_raw = ambil(row, "no_hp")
             hasil["menunggak"].append({
                 "id_pelanggan": idpel,
                 "nama": _cell_text(ambil(row, "nama")) or None,
-                "no_hp": normalize_wa(hp_raw),
-                "alamat": _cell_text(ambil(row, "alamat")) or None,
+                "no_hp": hp_norm,
+                "alamat": alamat_val or None,
                 "periode": _label_periode(periode_raw) or None,
                 "nominal": nominal,
                 "jatuh_tempo": due,
                 "kategori": "MENUNGGAK" if today > due else "BELUM_JATUH_TEMPO",
+                "pemda": _cell_text(ambil(row, "pemda")) or None,
+                "unitup": _cell_text(ambil(row, "nama_unitup")) or _cell_text(ambil(row, "unitup")) or None,
+                "tarip": _cell_text(ambil(row, "tarip")) or None,
+                "daya": _cell_text(ambil(row, "daya")) or None,
             })
 
     if hasil["sheet_terbaca"] == 0:
@@ -390,8 +459,8 @@ def analisis_file(filename: str, content: bytes, batas: int, today: datetime.dat
     if periode_otomatis:
         hasil["peringatan"].append("Kolom Periode tidak ada / kosong, jadi data disimpan pada bulan yang terbaca dari nama file "
                                    "(bila tidak ada, bulan ini). Tambahkan kolom Periode agar tepat, contoh: 2026-08.")
-    if "Nomor WA/HP" not in hasil["kolom_terbaca"] and "No. WA/HP" not in hasil["kolom_terbaca"]:
-        hasil["peringatan"].append("Kolom No. WA/HP tidak ditemukan, pesan belum bisa dikirim.")
+    if "No. WA PIC" not in hasil["kolom_terbaca"] and "No. WA/HP" not in hasil["kolom_terbaca"] and "No. WA Manager" not in hasil["kolom_terbaca"]:
+        hasil["peringatan"].append("Kolom No. WA PIC / No. WA tidak ditemukan, pesan belum bisa dikirim.")
 
     hasil["total_baris"] = len(hasil["menunggak"]) + hasil["lunas"]
     return hasil
@@ -432,14 +501,22 @@ def render_pesan(template: Optional[str], row: dict, batas: int = None) -> str:
     template = (template or "").strip() or get_pesan_default(today_dt)
 
     jt = row.get("jatuh_tempo")
+    nom = row.get("nominal")
+    tagihan_str = rupiah(nom)
     nilai = {
         "nama": (row.get("nama") or "Pelanggan").title(),
         "idpel": row.get("id_pelanggan") or "-",
         "periode": row.get("periode") or "-",
-        "tagihan": rupiah(row.get("nominal")),
+        "tagihan": tagihan_str,
+        "tunggakan": tagihan_str,
+        "nominal": tagihan_str,
         "jatuh_tempo": jt if isinstance(jt, str) else (jt.strftime("%d-%m-%Y") if jt else "-"),
         "hari_terlambat": str(row.get("hari_terlambat") if row.get("hari_terlambat") is not None else "-"),
         "alamat": row.get("alamat") or "-",
+        "pemda": row.get("pemda") or "-",
+        "unitup": row.get("unitup") or "-",
+        "tarip": row.get("tarip") or "-",
+        "daya": str(row.get("daya") or "-"),
         "batas_tanggal": str(batas or BATAS_TANGGAL_DEFAULT),
         "tanggal_sekarang": str(today_dt.day),
         "tanggal_hari_ini": str(today_dt.day),
@@ -448,6 +525,15 @@ def render_pesan(template: Optional[str], row: dict, batas: int = None) -> str:
         "salam": _salam(),
         "kontak": KONTAK_PLN,
     }
+
+    # Pastikan jika template belum memuat {tagihan}/{tunggakan} setelah {idpel},
+    # nilai tunggakan disisipkan otomatis setelah id pel
+    if "{tagihan}" not in template and "{tunggakan}" not in template:
+        if "{idpel}." in template:
+            template = template.replace("{idpel}.", "{idpel} sebesar {tagihan}.")
+        elif "{idpel}" in template:
+            template = template.replace("{idpel}", "{idpel} sebesar {tagihan}")
+
     return re.sub(r"\{(\w+)\}", lambda m: nilai.get(m.group(1), m.group(0)), template)
 
 
@@ -492,7 +578,7 @@ def kirim_fonnte(phone: str, message: str):
 class PesanPayload(BaseModel):
     template: Optional[str] = None
     batas_tanggal: Optional[int] = None
-    template_kode: Optional[str] = None   # None = pesan standar lama | 'AUTO' = saran otomatis | kode wa_template
+    template_kode: Optional[str] = "AUTO"   # 'AUTO' = saran otomatis (default) | kode wa_template
 
 
 class PreviewPayload(PesanPayload):
@@ -518,28 +604,72 @@ def pesan_default(user: dict = Depends(get_current_user)):
 @router.get("/template")
 def unduh_template(user: dict = Depends(get_current_user_from_query)):
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+
     wb = Workbook()
     ws = wb.active
     ws.title = "Data Pelanggan"
-    ws.append(["ID Pelanggan", "Nama", "No WA", "Alamat", "Periode", "Tagihan", "Status"])
-    ws.append(["535500409050", "Budi Santoso", "081234567890", "Jl. Merdeka No. 1, Medan", "2026-09", 185000, "Belum Bayar"])
-    ws.append(["535500409051", "Siti Aminah", "082198765432", "Jl. Sudirman No. 5, Medan", "2026-09", 240500, "Lunas"])
-    for c in ws[1]:
-        c.font = Font(bold=True, color="FFFFFF")
-        c.fill = PatternFill("solid", fgColor="1A6FD4")
-    for col, w in zip("ABCDEFG", (18, 24, 16, 34, 12, 14, 14)):
-        ws.column_dimensions[col].width = w
+
+    headers = [
+        "UNITUP", "UNITAP", "NAMA_UNITUP", "IDPEL", "PEMDA", "NAMA",
+        "TARIP", "DAYA", "KDGOL", "segment lgg", "Rptag NOW", "Tgl Bayar Bln Now",
+        "Status Now", "helper", "Jun", "Jul", "Agustus", "Ket Jun",
+        "Kesimpulan TW 1", "Pola Bayar TW1", "No WA PIC Pembayaran",
+        "Nama PIC Pembayaran", "No WA Manager", "Nama Manager", "Ket"
+    ]
+    ws.append(headers)
+
+    ws.append([
+        "53551", "53550", "ULP RIVAI", "535500409050", "PEMDA PALEMBANG", "DINAS PENDIDIKAN",
+        "P1", 33000, "P1", "PEMDA", 12500000, None,
+        "BELUM BAYAR", "", "LUNAS", "LUNAS", "LUNAS", "Lancar",
+        "Baik", "Tepat Waktu", "081234567890", "Ahmad Fauzi", "081987654321", "Bambang", "Prioritas penagihan"
+    ])
+    ws.append([
+        "53551", "53550", "ULP RIVAI", "535500409051", "PEMDA PALEMBANG", "DINAS KESEHATAN",
+        "P1", 22000, "P1", "PEMDA", 8450000, "2026-10-15",
+        "LUNAS", "", "LUNAS", "LUNAS", "LUNAS", "Lancar",
+        "Baik", "Tepat Waktu", "082198765432", "Siti Rahma", "081987654321", "Bambang", "Sudah lunas"
+    ])
+
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="1A6FD4")
+
+    for col_num in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        col_letter = get_column_letter(col_num)
+        ws.column_dimensions[col_letter].width = max(len(headers[col_num - 1]) + 4, 15)
+
     ws2 = wb.create_sheet("Petunjuk")
-    for line in [
-        "Kolom wajib: ID Pelanggan. Agar WA terkirim, isi juga No WA dan Nama.",
-        "Kolom Status diisi 'Lunas' atau 'Belum Bayar'. Bisa diganti kolom 'Tunggakan' (nominal) atau 'Tanggal Bayar'.",
-        "Kolom opsional: Alamat, Periode (contoh 2026-09 atau September 2026), Tagihan, Jatuh Tempo.",
-        f"Pelanggan dianggap menunggak bila belum lunas dan hari ini sudah melewati tanggal {BATAS_TANGGAL_DEFAULT} (atau tanggal pada kolom Jatuh Tempo).",
-        "Nama kolom tidak harus persis sama; sistem mengenali variasi seperti 'No HP', 'IDPEL', 'Nama Pelanggan'.",
-    ]:
+    petunjuk_lines = [
+        "PETUNJUK FORMAT EXCEL/CSV PENAGIHAN PLN:",
+        "",
+        "1. Kolom Utama:",
+        "   - IDPEL: ID Pelanggan PLN (Wajib).",
+        "   - NAMA: Nama pelanggan PLN (Wajib untuk sapaan pesan).",
+        "   - No WA PIC Pembayaran: Nomor WhatsApp PIC pembayaran (format 08xx atau 62xx).",
+        "   - No WA Manager: Nomor WA Manager (digunakan otomatis jika No WA PIC kosong).",
+        "   - Rptag NOW: Nominal tagihan bulan berjalan (Rptag NOW).",
+        "   - Status Now: Status pelunasan bulan berjalan ('LUNAS' atau 'BELUM BAYAR').",
+        "   - Tgl Bayar Bln Now: Tanggal bayar jika pelanggan telah lunas bulan ini.",
+        "",
+        "2. Kolom Tambahan / Pendukung:",
+        "   - UNITUP, UNITAP, NAMA_UNITUP, PEMDA, TARIP, DAYA, KDGOL, segment lgg.",
+        "   - Nama PIC Pembayaran, Nama Manager, Ket.",
+        "",
+        "3. Fitur Otomatisasi:",
+        "   - Sistem otomatis menggunakan kolom 'Rptag NOW' sebagai tagihan rupiah dan 'Tgl Bayar Bln Now' sebagai status bayar.",
+        "   - Pesan WhatsApp dikirim otomatis dengan template bertahap & nominal tunggakan tercantum setelah ID PEL.",
+        f"   - Pelanggan dianggap menunggak jika belum lunas dan melewati batas pembayaran (default tanggal {BATAS_TANGGAL_DEFAULT})."
+    ]
+    for line in petunjuk_lines:
         ws2.append([line])
-    ws2.column_dimensions["A"].width = 120
+    ws2.column_dimensions["A"].width = 110
+
     buf = io.BytesIO()
     wb.save(buf)
     return Response(

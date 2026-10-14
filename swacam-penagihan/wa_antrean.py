@@ -329,7 +329,7 @@ class AntreanPayload(BaseModel):
     template: Optional[str] = None
     batas_tanggal: Optional[int] = None
     kirim_ulang: bool = False
-    template_kode: Optional[str] = None   # None = pesan standar lama | 'AUTO' | kode wa_template
+    template_kode: Optional[str] = "AUTO"   # 'AUTO' = saran otomatis (default) | kode wa_template
 
 
 def _batch_dict(b) -> dict:

@@ -64,12 +64,12 @@ def ambil_template(kode: str) -> Optional[dict]:
 
 
 def jendela_pengingat(hari: datetime.date = None) -> dict:
-    """Pengingat ramah boleh dikirim pada tanggal mulai..selesai (default tanggal 2-20 masa pembayaran PLN)."""
+    """Pengingat ramah boleh dikirim pada tanggal mulai..selesai (default tanggal 15-17 sebelum jatuh tempo)."""
     hari = hari or datetime.date.today()
     s = SessionLocal()
     try:
-        mulai = _pengaturan_int(s, "pengingat_awal_mulai", 2)
-        selesai = _pengaturan_int(s, "pengingat_awal_selesai", 20)
+        mulai = _pengaturan_int(s, "pengingat_awal_mulai", 15)
+        selesai = _pengaturan_int(s, "pengingat_awal_selesai", 17)
     finally:
         s.close()
     return {"mulai": mulai, "selesai": selesai, "terbuka": mulai <= hari.day <= selesai}
@@ -132,11 +132,6 @@ def pilih_otomatis(row: dict, mx_esk: Optional[int], templates: List[dict],
                    jendela: dict) -> Tuple[Optional[dict], Optional[str]]:
     """Return (template, alasan_ditolak). Tepat salah satu yang terisi."""
     by_tahap = {t["tahap"]: t for t in templates}
-    today_day = datetime.date.today().day
-
-    # Bila hari ini masih tanggal 2 s/d 20 (masa periode pembayaran), prioritaskan template pengingat masa pembayaran
-    if today_day <= 20 and 0 in by_tahap:
-        return by_tahap[0], None
 
     sel = hari_selisih(row)
     if sel <= 0:
@@ -156,22 +151,18 @@ def pilih_otomatis(row: dict, mx_esk: Optional[int], templates: List[dict],
     return by_tahap[tahap], None
 
 
-def siapkan_pesan(row: dict, mode: Optional[str], teks_custom: Optional[str], batas: Optional[int],
+def siapkan_pesan(row: dict, mode: Optional[str] = MODE_AUTO, teks_custom: Optional[str] = None, batas: Optional[int] = None,
                   tahap_info: Tuple[Optional[int], Optional[int]] = (None, None),
                   templates: List[dict] = None, jendela: dict = None) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """
     Return (pesan, kode_template, alasan_dilewati).
-      mode None      -> perilaku lama (satu pesan standar, hanya untuk yang sudah lewat jatuh tempo)
-      mode 'AUTO'    -> template dipilih per pelanggan (lihat aturan di atas)
-      mode <KODE>    -> template tertentu; dicek cocok dengan keadaan pelanggan
+      mode None / 'AUTO' -> template dipilih per pelanggan secara otomatis
+      mode <KODE>        -> template tertentu; dicek cocok dengan keadaan pelanggan
     teks_custom (bila diisi dan mode bukan AUTO) memakai isi yang sudah diedit admin di textarea.
     """
     import tunggakan as tg
+    mode = mode or MODE_AUTO
     sel = hari_selisih(row)
-    if not mode:
-        if sel <= 0:
-            return None, None, f"Belum melewati batas pembayaran"
-        return tg.render_pesan(teks_custom, row, batas), None, None
 
     templates = templates if templates is not None else daftar_template()
     if not templates:

@@ -2,7 +2,7 @@ from sqlalchemy import create_engine, text
 from config import DATABASE_URL
 engine = create_engine(DATABASE_URL)
 with engine.connect() as conn:
-    tpl_ramah = """Yth. Bapak/Ibu Pelanggan PLN, {nama} dengan ID Pelanggan {idpel}.
+    tpl_ramah = """Yth. Bapak/Ibu Pelanggan PLN, {nama} dengan ID Pelanggan {idpel} sebesar {tagihan}.
 
 Sebagai bentuk pelayanan terbaik, kami mengingatkan bahwa periode pembayaran tagihan listrik berlangsung setiap tanggal 2 hingga tanggal 20 setiap bulan.
 
@@ -15,13 +15,13 @@ Terima kasih atas perhatian dan kerja sama Bapak/Ibu dalam menjaga kelancaran pe
 Salam hormat,
 PT PLN (Persero) UID S2JB."""
 
-    tpl_lewat = """Yth. Bapak/Ibu Pelanggan PLN, {nama} ID PEL. {idpel}.
+    tpl_lewat = """Yth. Bapak/Ibu Pelanggan PLN, {nama} ID PEL. {idpel} sebesar {tagihan}.
 
 Sebagai bentuk pelayanan terbaik, kami mengingatkan bahwa periode pembayaran tagihan listrik berlangsung setiap tanggal 2 hingga tanggal 20 setiap bulan.
 
 Kami menghimbau Bapak/Ibu untuk melakukan pembayaran sebelum tanggal 20 melalui kanal pembayaran resmi seperti PLN Mobile maupun gerai pembayaran lainnya.
 
-Bapak Ibu Yth, kami informasikan bahwa hari ini telah memasuki tanggal 21 akan tetapi tagihan listrik belum diselesaikan, maka sesuai ketentuan yang berlaku akan dilakukan pemutusan sementara aliran listrik sampai dengan kewajiban pembayaran dipenuhi.
+Bapak Ibu Yth, kami informasikan bahwa hari ini telah memasuki tanggal {tanggal_sekarang} akan tetapi tagihan listrik belum diselesaikan, maka sesuai ketentuan yang berlaku akan dilakukan pemutusan sementara aliran listrik sampai dengan kewajiban pembayaran dipenuhi.
 
 Kami mengharapkan Bapak/Ibu mempunyai back up kelistrikan cadangan seperti genset dan lain-lain.
 
